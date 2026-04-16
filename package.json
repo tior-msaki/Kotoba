@@ -1,0 +1,29 @@
+{
+  "name": "kotoba",
+  "version": "1.0.0",
+  "description": "Int commit",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tior-msaki/Kotoba.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/tior-msaki/Kotoba/issues"
+  },
+  "homepage": "https://github.com/tior-msaki/Kotoba#readme",
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  },
+  "dependencies": {
+    "dexie": "^4.4.2"
+  }
+}
