@@ -312,7 +312,152 @@
             top: 673px;
             background-image: url("assets/home/cd_player.png");
         }
+
+        .bunny-cards,
+        .photocards {
+            cursor: pointer;
+        }
+
+        .album-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        .album-overlay.open {
+            display: flex;
+        }
+
+        .album-stage {
+            position: relative;
+            width: 1440px;
+            height: 1024px;
+            transform-origin: center center;
+            flex-shrink: 0;
+        }
+
+        .album-stage > div {
+            background-repeat: no-repeat;
+            background-size: contain;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .album {
+            position: absolute;
+            width: 1280px;
+            height: 1024px;
+            left: 79px;
+            top: 0px;
+            background-image: url("assets/album%20overlay/album.png");
+        }
+
+        .album-page {
+            position: absolute;
+            width: 509px;
+            height: 639px;
+            left: 236px;
+            top: 190px;
+            background-image: url("assets/album%20overlay/page.png");
+        }
+
+        .album-slot {
+            position: absolute;
+            width: 150px;
+            height: 224px;
+            background-repeat: no-repeat;
+            background-size: contain;
+            background-position: center;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .album-slot.s1 { left: 300px; top: 252px; }
+        .album-slot.s2 { left: 485px; top: 252px; }
+        .album-slot.s3 { left: 305px; top: 542px; }
+        .album-slot.s4 { left: 490px; top: 542px; }
+        .album-slot.s5 { left: 775px; top: 257px; }
+        .album-slot.s6 { left: 960px; top: 257px; }
+        .album-slot.s7 { left: 780px; top: 547px; }
+        .album-slot.s8 { left: 965px; top: 547px; }
+
+        .album-slot.f1 { left: 353px; top: 400px; }
+        .album-slot.f2 { left: 773px; top: 254px; }
+        .album-slot.f3 { left: 958px; top: 254px; }
+        .album-slot.f4 { left: 778px; top: 544px; }
+        .album-slot.f5 { left: 963px; top: 544px; }
+
+        .album-left-btn {
+            position: absolute;
+            width: 88px;
+            height: 85px;
+            left: 610px;
+            top: 850px;
+            background-image: url("assets/album%20overlay/left%20button.png");
+            cursor: pointer;
+        }
+
+        .album-right-btn {
+            position: absolute;
+            width: 87px;
+            height: 85px;
+            left: 719px;
+            top: 850px;
+            background-image: url("assets/album%20overlay/right%20button.png");
+            cursor: pointer;
+        }
+
+        .album-exit {
+            position: absolute;
+            width: 76px;
+            height: 114px;
+            left: 1140px;
+            top: 120px;
+            background-image: url("assets/album%20overlay/exit%20pager.png");
+            cursor: pointer;
+        }
+
+        .album-add-card,
+        .album-reset {
+            position: absolute;
+            height: 35px;
+            font-family: 'Forum', serif;
+            font-style: normal;
+            font-weight: 400;
+            font-size: 32px;
+            line-height: 35px;
+            text-decoration-line: underline;
+            color: #000000;
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .album-add-card {
+            width: 112px;
+            left: 984px;
+            top: 138px;
+        }
+
+        .album-reset {
+            width: 112px;
+            left: 984px;
+            top: 180px;
+        }
+
+        .album-left-btn.disabled,
+        .album-right-btn.disabled {
+            opacity: 0.35;
+            pointer-events: none;
+        }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=Forum&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="viewport">
@@ -340,13 +485,144 @@
         <div class="enter-cd-bubble"></div>
     </div>
     </div>
+
+    <div class="album-overlay" id="albumOverlay">
+        <div class="album-stage">
+            <div class="album"></div>
+            <div class="album-page"></div>
+            <div class="album-slot front f1"></div>
+            <div class="album-slot front f2"></div>
+            <div class="album-slot front f3"></div>
+            <div class="album-slot front f4"></div>
+            <div class="album-slot front f5"></div>
+            <div class="album-slot regular s1"></div>
+            <div class="album-slot regular s2"></div>
+            <div class="album-slot regular s3"></div>
+            <div class="album-slot regular s4"></div>
+            <div class="album-slot regular s5"></div>
+            <div class="album-slot regular s6"></div>
+            <div class="album-slot regular s7"></div>
+            <div class="album-slot regular s8"></div>
+            <div class="album-left-btn" id="albumLeftBtn"></div>
+            <div class="album-right-btn" id="albumRightBtn"></div>
+            <div class="album-exit" id="albumExit"></div>
+            <button class="album-add-card" id="albumAddCard">add card</button>
+            <button class="album-reset" id="albumReset">reset</button>
+        </div>
+    </div>
     <script>
         function scaleContent() {
             const scale = Math.min(window.innerWidth / 1440, window.innerHeight / 1024);
             document.querySelector('.home-page').style.transform = `scale(${scale})`;
+            const stage = document.querySelector('.album-stage');
+            if (stage) stage.style.transform = `scale(${scale})`;
         }
         window.addEventListener('resize', scaleContent);
         scaleContent();
+
+        const albumOverlay = document.getElementById('albumOverlay');
+        const openAlbum = (e) => {
+            e.stopPropagation();
+            albumOverlay.classList.add('open');
+            renderAlbum();
+        };
+        document.querySelector('.bunny-cards').addEventListener('click', openAlbum);
+        document.querySelector('.photocards').addEventListener('click', openAlbum);
+        document.getElementById('albumExit').addEventListener('click', () => {
+            albumOverlay.classList.remove('open');
+        });
+
+        const ALBUM_STORAGE_KEY = 'kotoba-bunny-album';
+        const FRONT_CAPACITY = 5;
+        const REGULAR_CAPACITY = 8;
+        const CARD_POOL = [
+            ...Array.from({ length: 23 }, (_, i) => `assets/bunny_photocards/bunny_${i + 1}.JPG`),
+            ...Array.from({ length: 3 }, (_, i) => `assets/special_pc/special_pc_${i + 1}.JPG`),
+        ];
+        let addedCards = [];
+        let albumPage = 0;
+        try {
+            const raw = JSON.parse(localStorage.getItem(ALBUM_STORAGE_KEY)) || [];
+            addedCards = raw.map(v =>
+                typeof v === 'number' ? `assets/bunny_photocards/bunny_${v}.JPG` : v
+            );
+        } catch (_) {
+            addedCards = [];
+        }
+
+        const frontSlotEls = Array.from(document.querySelectorAll('.album-slot.front'));
+        const regularSlotEls = Array.from(document.querySelectorAll('.album-slot.regular'));
+        const albumPageEl = document.querySelector('.album-page');
+        const leftBtn = document.getElementById('albumLeftBtn');
+        const rightBtn = document.getElementById('albumRightBtn');
+
+        function saveAlbum() {
+            localStorage.setItem(ALBUM_STORAGE_KEY, JSON.stringify(addedCards));
+        }
+
+        function totalPages() {
+            if (addedCards.length <= FRONT_CAPACITY) return 1;
+            return 1 + Math.ceil((addedCards.length - FRONT_CAPACITY) / REGULAR_CAPACITY);
+        }
+
+        function pageStartIndex(page) {
+            return page === 0 ? 0 : FRONT_CAPACITY + (page - 1) * REGULAR_CAPACITY;
+        }
+
+        function pageForCardIndex(cardIdx) {
+            if (cardIdx < FRONT_CAPACITY) return 0;
+            return 1 + Math.floor((cardIdx - FRONT_CAPACITY) / REGULAR_CAPACITY);
+        }
+
+        function renderAlbum() {
+            if (albumPage > totalPages() - 1) albumPage = totalPages() - 1;
+            if (albumPage < 0) albumPage = 0;
+
+            const isFront = albumPage === 0;
+            const activeSlots = isFront ? frontSlotEls : regularSlotEls;
+            const inactiveSlots = isFront ? regularSlotEls : frontSlotEls;
+
+            inactiveSlots.forEach(s => {
+                s.style.display = 'none';
+                s.style.backgroundImage = '';
+            });
+
+            const start = pageStartIndex(albumPage);
+            activeSlots.forEach((slot, i) => {
+                slot.style.display = '';
+                const cardPath = addedCards[start + i];
+                slot.style.backgroundImage = cardPath ? `url("${cardPath}")` : '';
+            });
+
+            if (albumPageEl) albumPageEl.style.display = isFront ? 'none' : '';
+
+            leftBtn.classList.toggle('disabled', albumPage === 0);
+            rightBtn.classList.toggle('disabled', albumPage >= totalPages() - 1);
+        }
+
+        document.getElementById('albumAddCard').addEventListener('click', () => {
+            const next = CARD_POOL[Math.floor(Math.random() * CARD_POOL.length)];
+            addedCards.push(next);
+            saveAlbum();
+            albumPage = pageForCardIndex(addedCards.length - 1);
+            renderAlbum();
+        });
+
+        document.getElementById('albumReset').addEventListener('click', () => {
+            addedCards = [];
+            albumPage = 0;
+            saveAlbum();
+            renderAlbum();
+        });
+
+        leftBtn.addEventListener('click', () => {
+            if (albumPage > 0) { albumPage--; renderAlbum(); }
+        });
+        rightBtn.addEventListener('click', () => {
+            if (albumPage < totalPages() - 1) { albumPage++; renderAlbum(); }
+        });
+
+        renderAlbum();
 
         const homePage = document.querySelector('.home-page');
         document.querySelector('.arrow').addEventListener('click', () => {
