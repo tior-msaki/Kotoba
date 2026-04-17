@@ -13,6 +13,15 @@
             background: #FFFFFF;
         }
 
+        body {
+            opacity: 0;
+            transition: opacity 0.35s ease;
+        }
+
+        body.page-ready {
+            opacity: 1;
+        }
+
         .viewport {
             width: 100vw;
             height: 100vh;
@@ -67,10 +76,6 @@
 
         .cd-player {
             z-index: 5;
-        }
-
-        .disk {
-            cursor: pointer;
         }
 
         .table {
@@ -204,6 +209,11 @@
             background-image: url("assets/home/disk.png");
             touch-action: none;
             z-index: 50;
+            cursor: grab;
+        }
+
+        .disk.dragging {
+            cursor: grabbing;
         }
 
         .disk.snapping {
@@ -239,6 +249,7 @@
             left: 1315px;
             top: 45px;
             background-image: url("assets/home/cds.png");
+            cursor: pointer;
         }
 
         .bunny-cards {
@@ -375,15 +386,19 @@
         .album-overlay {
             position: fixed;
             inset: 0;
-            display: none;
+            display: flex;
             align-items: center;
             justify-content: center;
             background: rgba(0, 0, 0, 0.5);
             z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
         }
 
         .album-overlay.open {
-            display: flex;
+            opacity: 1;
+            pointer-events: auto;
         }
 
         .album-stage {
@@ -582,6 +597,12 @@
         window.addEventListener('resize', scaleContent);
         scaleContent();
 
+        requestAnimationFrame(() => document.body.classList.add('page-ready'));
+        function navigateTo(url) {
+            document.body.classList.remove('page-ready');
+            setTimeout(() => { window.location.href = url; }, 350);
+        }
+
         const albumOverlay = document.getElementById('albumOverlay');
         const openAlbum = (e) => {
             e.stopPropagation();
@@ -737,6 +758,7 @@
                 diskLastDy = 0;
             }
             diskEl.classList.remove('snapping');
+            diskEl.classList.add('dragging');
             diskEl.setPointerCapture(e.pointerId);
         });
 
@@ -755,6 +777,7 @@
         function endDiskDrag(e) {
             if (!diskDragging) return;
             diskDragging = false;
+            diskEl.classList.remove('dragging');
             const overlaps = diskOverlapsCD(diskLastDx, diskLastDy);
             diskEl.classList.add('snapping');
             if (overlaps) {
@@ -780,7 +803,11 @@
                 return;
             }
             localStorage.setItem('kotoba-visited', '1');
-            window.location.href = 'diskbox.html';
+            navigateTo('diskbox.html');
+        });
+
+        document.querySelector('.cds').addEventListener('click', () => {
+            navigateTo('disk-select.html');
         });
 
         document.querySelector('.cd-player').addEventListener('click', () => {

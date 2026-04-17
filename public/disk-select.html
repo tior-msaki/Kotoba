@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Kotoba - Disk Select</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            background: #FFFFFF;
+        }
+
+        body {
+            opacity: 0;
+            transition: opacity 0.35s ease;
+        }
+
+        body.page-ready {
+            opacity: 1;
+        }
+
+        .viewport {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .disk-select {
+            position: relative;
+            width: 1440px;
+            height: 1024px;
+            background: #FFFFFF;
+            transform-origin: center center;
+            flex-shrink: 0;
+        }
+
+        .disk-select > div {
+            background-repeat: no-repeat;
+            background-size: contain;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .title-bubble {
+            position: absolute;
+            width: 1310px;
+            height: 248px;
+            left: 78px;
+            top: 77px;
+            background-image: url("assets/disk select/title bubble.png");
+        }
+
+        .playlist-title {
+            position: absolute;
+            width: 875px;
+            height: 63px;
+            left: calc(50% - 875px/2 + 17.5px);
+            top: 155px;
+            font-family: 'Gamja Flower', cursive;
+            font-style: normal;
+            font-weight: 400;
+            font-size: 50px;
+            line-height: 62px;
+            color: #000000;
+            text-align: center;
+        }
+
+        .cd {
+            position: absolute;
+            width: 355px;
+            height: 363px;
+            left: -1000px;
+            top: 800px;
+            opacity: 0;
+            cursor: pointer;
+            transition: left 0.35s ease, top 0.35s ease, opacity 0.35s ease;
+        }
+
+        .cd.no-transition {
+            transition: none;
+        }
+
+        .left-arrow {
+            position: absolute;
+            width: 182px;
+            height: 134px;
+            left: 529px;
+            top: 790px;
+            background-image: url("assets/disk select/left arrow.png");
+            cursor: pointer;
+            z-index: 20;
+        }
+
+        .right-arrow {
+            position: absolute;
+            width: 175px;
+            height: 138px;
+            left: 735px;
+            top: 783px;
+            background-image: url("assets/disk select/right arrow.png");
+            cursor: pointer;
+            z-index: 20;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Gamja+Flower&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="viewport">
+        <div class="disk-select">
+            <div class="title-bubble"></div>
+            <div class="playlist-title"></div>
+            <div class="left-arrow"></div>
+            <div class="right-arrow"></div>
+        </div>
+    </div>
+    <script>
+        function scaleContent() {
+            const scale = Math.min(window.innerWidth / 1440, window.innerHeight / 1024);
+            document.querySelector('.disk-select').style.transform = `scale(${scale})`;
+        }
+        window.addEventListener('resize', scaleContent);
+        scaleContent();
+
+        requestAnimationFrame(() => document.body.classList.add('page-ready'));
+        function navigateTo(url) {
+            document.body.classList.remove('page-ready');
+            setTimeout(() => { window.location.href = url; }, 350);
+        }
+
+        const playlists = Array.from({ length: 10 }, (_, i) => ({
+            name: `Playlist ${i + 1}`,
+            image: 'assets/disk select/cd.png',
+        }));
+
+        const SLOTS = {
+            '-2': { left: -252, top: 620, opacity: 1, z: 1 },
+            '-1': { left: 123,  top: 435, opacity: 1, z: 2 },
+            '0':  { left: 542,  top: 345, opacity: 1, z: 3 },
+            '1':  { left: 980,  top: 420, opacity: 1, z: 2 },
+            '2':  { left: 1335, top: 620, opacity: 1, z: 1 },
+        };
+        const OFF_LEFT  = { left: -700,  top: 800, opacity: 0, z: 0 };
+        const OFF_RIGHT = { left: 1700,  top: 800, opacity: 0, z: 0 };
+
+        function slotFor(offset) {
+            if (SLOTS[offset]) return SLOTS[offset];
+            return offset < 0 ? OFF_LEFT : OFF_RIGHT;
+        }
+
+        const stage = document.querySelector('.disk-select');
+        const titleEl = document.querySelector('.playlist-title');
+        let currentIndex = 0;
+        const prevOffsets = new Map();
+
+        const cdEls = playlists.map((pl, i) => {
+            const el = document.createElement('div');
+            el.className = 'cd';
+            el.style.backgroundImage = `url("${pl.image}")`;
+            el.dataset.index = i;
+            el.addEventListener('click', () => {
+                if (i === currentIndex) {
+                    navigateTo('home.html');
+                    return;
+                }
+                const n = playlists.length;
+                let delta = i - currentIndex;
+                if (delta > n / 2) delta -= n;
+                if (delta < -n / 2) delta += n;
+                currentIndex = (currentIndex + delta + n) % n;
+                render();
+            });
+            stage.insertBefore(el, document.querySelector('.left-arrow'));
+            return el;
+        });
+
+        function render() {
+            const n = playlists.length;
+            cdEls.forEach((el, i) => {
+                let offset = i - currentIndex;
+                while (offset > n / 2) offset -= n;
+                while (offset < -n / 2) offset += n;
+
+                const prev = prevOffsets.get(i);
+                const jumped = prev !== undefined && Math.abs(offset - prev) > 1;
+                if (jumped) {
+                    el.classList.add('no-transition');
+                    void el.offsetHeight;
+                }
+
+                const slot = slotFor(offset);
+                el.style.left = slot.left + 'px';
+                el.style.top = slot.top + 'px';
+                el.style.opacity = slot.opacity;
+                el.style.zIndex = slot.z;
+
+                if (jumped) {
+                    requestAnimationFrame(() => el.classList.remove('no-transition'));
+                }
+                prevOffsets.set(i, offset);
+            });
+            titleEl.textContent = playlists[currentIndex].name;
+        }
+
+        function next() {
+            currentIndex = (currentIndex + 1) % playlists.length;
+            render();
+        }
+        function prev() {
+            currentIndex = (currentIndex - 1 + playlists.length) % playlists.length;
+            render();
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') { next(); e.preventDefault(); }
+            else if (e.key === 'ArrowLeft') { prev(); e.preventDefault(); }
+            else if (e.key === 'Enter' || e.key === ' ') {
+                window.location.href = 'home.html';
+                e.preventDefault();
+            }
+        });
+        document.querySelector('.right-arrow').addEventListener('click', next);
+        document.querySelector('.left-arrow').addEventListener('click', prev);
+
+        render();
+    </script>
+</body>
+</html>
