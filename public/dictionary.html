@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>和英辞典</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Linux+Libertine:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #555;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 24px 16px 32px;
+  gap: 20px;
+  font-family: 'Linux Libertine', 'Times New Roman', serif;
+}
+
+/* ── Navigation ── */
+#nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  user-select: none;
+}
+
+.nav-btn {
+  background: #e8e0d0;
+  border: none;
+  border-radius: 4px;
+  padding: 7px 22px;
+  font-size: 13px;
+  font-family: Georgia, serif;
+  font-style: italic;
+  color: #222;
+  cursor: pointer;
+  box-shadow: 1px 2px 5px rgba(0,0,0,0.35);
+  transition: background 0.15s;
+}
+.nav-btn:hover { background: #d8cfc0; }
+.nav-btn:disabled { opacity: 0.35; cursor: default; background: #e8e0d0; }
+
+#indicator {
+  color: #e8e0d0;
+  font-size: 12px;
+  font-style: italic;
+  font-family: Georgia, serif;
+  min-width: 90px;
+  text-align: center;
+  letter-spacing: 0.03em;
+}
+
+/* ══════════════════════════════════════════
+   BOOK WRAP — outer container
+   Wide: column layout, tabs sit on top edge
+   Narrow: row layout, tabs on left or right side
+══════════════════════════════════════════ */
+#book-wrap {
+  max-width: 700px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;   /* tabs above book by default */
+  align-items: stretch;
+  position: relative;
+}
+
+/* ── TOP TABS (wide screens) ── */
+#tabs-top {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 3px;
+  padding: 0 2px 0 2px;
+  user-select: none;
+  position: relative;
+  z-index: 3;
+  /* sits flush against the book top */
+  margin-bottom: -1px;
+}
+
+.tab-group {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  align-items: flex-end;
+  /* Small gap between groups */
+  margin-right: 6px;
+}
+.tab-group:last-child { margin-right: 0; }
+
+/* ── SIDE TABS (narrow screens) ── */
+#tabs-side {
+  display: none;   /* hidden by default, shown on narrow */
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  user-select: none;
+  position: absolute;
+  top: 0;
+  z-index: 3;
+}
+#tabs-side.side-left  { left: -34px; align-items: flex-end; }
+#tabs-side.side-right { right: -34px; align-items: flex-start; }
+
+/* ── SHARED TAB BUTTON ── */
+.tab {
+  background: #b5a898;
+  color: #2a1f14;
+  border: 1px solid #8a7060;
+  font-size: 13px;
+  font-family: 'Noto Serif JP', 'Times New Roman', serif;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.12s;
+  white-space: nowrap;
+  user-select: none;
+}
+.tab:hover { background: #cfc0b0; color: #1a0f06; }
+.tab.active {
+  background: #fdf8f2;
+  color: #1a0f06;
+  border-color: #8a7a68;
+  z-index: 4;
+}
+
+/* Top-tab shape: rounded top, no bottom border, bleeds into book */
+.tab-top {
+  border-bottom: none;
+  border-radius: 5px 5px 0 0;
+  padding: 4px 8px 3px;
+  box-shadow: 0 -1px 4px rgba(0,0,0,0.2);
+  position: relative;
+  bottom: -1px;
+}
+.tab-top.active {
+  border-bottom-color: #fdf8f2;
+  box-shadow: 0 -2px 6px rgba(0,0,0,0.15);
+}
+
+/* Side-tab shape: rounded outside edge, no inner border, bleeds into book */
+.tab-side-left {
+  border-right: none;
+  border-radius: 5px 0 0 5px;
+  padding: 5px 6px 5px 7px;
+  box-shadow: -2px 0 4px rgba(0,0,0,0.18);
+  position: relative;
+  right: -1px;
+}
+.tab-side-left.active {
+  border-right-color: #fdf8f2;
+  box-shadow: -2px 0 6px rgba(0,0,0,0.15);
+}
+.tab-side-right {
+  border-left: none;
+  border-radius: 0 5px 5px 0;
+  padding: 5px 7px 5px 6px;
+  box-shadow: 2px 0 4px rgba(0,0,0,0.18);
+  position: relative;
+  left: -1px;
+}
+.tab-side-right.active {
+  border-left-color: #fdf8f2;
+}
+
+/* ── BOOK SPREAD ── */
+#spread-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  position: relative;
+}
+
+#spread {
+  display: flex;
+  gap: 0;
+  box-shadow: 3px 5px 22px rgba(0,0,0,0.55);
+  width: 100%;
+  border: 1px solid #8a7a68;
+  position: relative;
+  z-index: 1;
+  aspect-ratio: 6 / 5;
+}
+
+/* ── SINGLE PAGE ── */
+.page {
+  background: #fdf8f2;
+  color: #000;
+  width: 50%;
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border: none;
+  overflow: hidden;
+}
+.page.left  { border-right: 1px solid #8a7a68; }
+
+/* ── NARROW: side tabs ── */
+@media (max-width: 560px) {
+  #tabs-top  { display: none; }
+  #tabs-side { display: flex; }
+  body { padding-left: 44px; padding-right: 44px; }
+}
+
+
+
+
+/* ── Page header ── */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1.5px solid #000;
+  padding: 3px 7px 2px 7px;
+  flex-shrink: 0;
+  background: #fdf8f2;
+}
+
+.hw-range {
+  font-size: 6.5pt;
+  font-weight: bold;
+  font-style: italic;
+}
+.pg { font-size: 6.5pt; }
+
+/* ── Two-column grid inside a page ── */
+.cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.col {
+  padding: 2px 4px 2px 5px;
+  overflow: hidden;
+}
+.col:first-child { border-right: 0.75px solid #000; }
+
+/* ── Section kana header ── */
+.sec {
+  font-size: 6.5pt;
+  font-weight: bold;
+  border-bottom: 0.5px solid #000;
+  margin: 3px 0 1.5px 0;
+  line-height: 1.1;
+  padding-bottom: 0.5px;
+}
+
+/* ── Entry ── */
+.e {
+  font-size: 5.7pt;
+  line-height: 1.3;
+  margin-bottom: 1.5px;
+  text-indent: -7px;
+  padding-left: 7px;
+}
+
+.hw {
+  font-weight: bold;
+  font-size: 6.2pt;
+  font-family: 'Noto Serif JP', 'Times New Roman', serif;
+}
+
+ruby { font-family: 'Noto Serif JP', 'Times New Roman', serif; }
+rt {
+  font-size: 3.8pt;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+
+.rom { font-style: italic; font-weight: normal; font-size: 5.5pt; }
+.pos { font-style: italic; font-size: 5.2pt; }
+.df  { font-size: 5.7pt; }
+.xr  { font-style: italic; font-size: 5.2pt; }
+.sn  { font-weight: bold; font-size: 5.2pt; }
+
+.note {
+  border: 0.5px solid #000;
+  padding: 2px 2.5px;
+  margin: 2px 0;
+  font-size: 5.1pt;
+  line-height: 1.3;
+}
+.note-lbl {
+  font-weight: bold;
+  font-size: 4.9pt;
+  letter-spacing: 0.05em;
+}
+
+/* ── Responsive: narrow → single page ── */
+@media (max-width: 480px) {
+  #spread { max-width: 340px; }
+  #spread .page.hidden-narrow { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="nav">
+  <button class="nav-btn" id="btn-prev" onclick="turn(-1)">← Back</button>
+  <span id="indicator"></span>
+  <button class="nav-btn" id="btn-next" onclick="turn(1)">Next →</button>
+</div>
+
+<div id="book-wrap">
+  <div id="tabs-top"></div>
+  <div id="spread-wrap">
+    <div id="tabs-side"></div>
+    <div id="spread"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   PAGE DATA  — each object = one physical page
+═══════════════════════════════════════════════ */
+const PAGES = [
+  /* ── PAGE 1 ── */
+  { range: 'aru — oishii', pg: 1, letters: ['あ','い','う','え','お'],
+    col1: `
+<div class="sec">あ &nbsp;a</div>
+<div class="e"><span class="hw"><ruby>ある<rt></rt></ruby></span> <span class="rom">(a·ru)</span> <span class="pos">v.i.</span> <span class="df">to exist; to be; to have. For inanimate things. <span class="xr">Cf. iru.</span></span></div>
+<div class="e"><span class="hw"><ruby>歩<rt>ある</rt>く</ruby></span> <span class="rom">(a·ru·ku)</span> <span class="pos">v.i.</span> <span class="df">to walk; to go on foot.</span></div>
+<div class="e"><span class="hw"><ruby>朝<rt>あさ</rt></ruby></span> <span class="rom">(a·sa)</span> <span class="pos">n.</span> <span class="df">morning; early part of the day.</span></div>
+<div class="e"><span class="hw"><ruby>明日<rt>あした</rt></ruby></span> <span class="rom">(a·shi·ta)</span> <span class="pos">n.</span> <span class="df">tomorrow; the day following today.</span></div>
+<div class="e"><span class="hw"><ruby>あそこ</ruby></span> <span class="rom">(a·so·ko)</span> <span class="pos">pron.</span> <span class="df">over there; far from both speaker and listener.</span></div>
+<div class="e"><span class="hw"><ruby>遊<rt>あそ</rt>ぶ</ruby></span> <span class="rom">(a·so·bu)</span> <span class="pos">v.i.</span> <span class="df">to play; to hang out; to amuse oneself.</span></div>
+<div class="e"><span class="hw"><ruby>熱<rt>あつ</rt>い</ruby></span> <span class="rom">(a·tsu·i¹)</span> <span class="pos">adj.</span> <span class="df">hot (object or food); burning to the touch. <span class="xr">Cf. atsui².</span></span></div>
+<div class="e"><span class="hw"><ruby>暑<rt>あつ</rt>い</ruby></span> <span class="rom">(a·tsu·i²)</span> <span class="pos">adj.</span> <span class="df">hot (weather or air); sweltering. <span class="xr">Cf. atsui¹.</span></span></div>
+<div class="e"><span class="hw"><ruby>会<rt>あ</rt>う</ruby></span> <span class="rom">(a·u)</span> <span class="pos">v.t.</span> <span class="df">to meet; to encounter; to see a person.</span></div>
+<div class="e"><span class="hw"><ruby>あなた</ruby></span> <span class="rom">(a·na·ta)</span> <span class="pos">pron.</span> <span class="df">you. Often omitted to avoid directness.</span></div>
+<div class="e"><span class="hw"><ruby>ありがとう</ruby></span> <span class="rom">(a·ri·ga·tō)</span> <span class="pos">interj.</span> <span class="df">thank you; thanks. Casual–polite.</span></div>
+<div class="sec">い &nbsp;i</div>
+<div class="e"><span class="hw"><ruby>家<rt>いえ</rt></ruby></span> <span class="rom">(i·e)</span> <span class="pos">n.</span> <span class="df">house; home; residence.</span></div>
+<div class="e"><span class="hw"><ruby>いい</ruby></span> <span class="rom">(ī)</span> <span class="pos">adj.</span> <span class="df">good; fine; acceptable. <span class="xr">Formal: yoi.</span></span></div>
+<div class="e"><span class="hw"><ruby>いいえ</ruby></span> <span class="rom">(ī·e)</span> <span class="pos">interj.</span> <span class="df">no; denial.</span></div>
+<div class="e"><span class="hw"><ruby>行<rt>い</rt>く</ruby></span> <span class="rom">(i·ku)</span> <span class="pos">v.i.</span> <span class="df">to go; to proceed away from speaker.</span></div>
+<div class="e"><span class="hw"><ruby>今<rt>いま</rt></ruby></span> <span class="rom">(i·ma)</span> <span class="pos">n./adv.</span> <span class="df">now; the present moment.</span></div>
+<div class="e"><span class="hw"><ruby>犬<rt>いぬ</rt></ruby></span> <span class="rom">(i·nu)</span> <span class="pos">n.</span> <span class="df">dog; domestic canine.</span></div>
+<div class="e"><span class="hw"><ruby>いる</ruby></span> <span class="rom">(i·ru)</span> <span class="pos">v.i.</span> <span class="df">to exist; to be. For animate beings. <span class="xr">Cf. aru.</span></span></div>
+<div class="e"><span class="hw"><ruby>椅子<rt>いす</rt></ruby></span> <span class="rom">(i·su)</span> <span class="pos">n.</span> <span class="df">chair; seat; stool.</span></div>
+<div class="e"><span class="hw"><ruby>いつ</ruby></span> <span class="rom">(i·tsu)</span> <span class="pos">pron.</span> <span class="df">when. Interrogative.</span></div>
+<div class="e"><span class="hw"><ruby>一<rt>いち</rt></ruby></span> <span class="rom">(i·chi)</span> <span class="pos">num.</span> <span class="df">one; 1.</span></div>
+<div class="e"><span class="hw"><ruby>忙<rt>いそが</rt>しい</ruby></span> <span class="rom">(i·so·ga·shī)</span> <span class="pos">adj.</span> <span class="df">busy; occupied; having much to do.</span></div>`,
+    col2: `
+<div class="sec">う &nbsp;u</div>
+<div class="e"><span class="hw"><ruby>海<rt>うみ</rt></ruby></span> <span class="rom">(u·mi)</span> <span class="pos">n.</span> <span class="df">sea; ocean; open water.</span></div>
+<div class="e"><span class="hw"><ruby>上<rt>うえ</rt></ruby></span> <span class="rom">(u·e)</span> <span class="pos">n.</span> <span class="df">above; up; top; the upper part.</span></div>
+<div class="e"><span class="hw"><ruby>嬉<rt>うれ</rt>しい</ruby></span> <span class="rom">(u·re·shī)</span> <span class="pos">adj.</span> <span class="df">happy; glad; pleased; delighted.</span></div>
+<div class="sec">え &nbsp;e</div>
+<div class="e"><span class="hw"><ruby>英語<rt>えいご</rt></ruby></span> <span class="rom">(ei·go)</span> <span class="pos">n.</span> <span class="df">the English language.</span></div>
+<div class="e"><span class="hw"><ruby>駅<rt>えき</rt></ruby></span> <span class="rom">(e·ki)</span> <span class="pos">n.</span> <span class="df">train station; railway station.</span></div>
+<div class="sec">お &nbsp;o</div>
+<div class="e"><span class="hw"><ruby>美味<rt>おい</rt>しい</ruby></span> <span class="rom">(o·i·shī)</span> <span class="pos">adj.</span> <span class="df">delicious; tasty; good to eat.</span></div>
+<div class="e"><span class="hw"><ruby>お金<rt>おかね</rt></ruby></span> <span class="rom">(o·ka·ne)</span> <span class="pos">n.</span> <span class="df">money; currency; cash. <span class="xr">Honorific o-.</span></span></div>
+<div class="e"><span class="hw"><ruby>起<rt>お</rt>きる</ruby></span> <span class="rom">(o·ki·ru)</span> <span class="pos">v.i.</span> <span class="df">to wake up; to get out of bed.</span></div>
+<div class="e"><span class="hw"><ruby>大<rt>おお</rt>きい</ruby></span> <span class="rom">(ō·kī)</span> <span class="pos">adj.</span> <span class="df">big; large; great in size.</span></div>
+<div class="e"><span class="hw"><ruby>遅<rt>おそ</rt>い</ruby></span> <span class="rom">(o·so·i)</span> <span class="pos">adj.</span> <span class="df"><span class="sn">1</span> slow; sluggish. <span class="sn">2</span> late; behind schedule.</span></div>
+<div class="e"><span class="hw"><ruby>終<rt>お</rt>わる</ruby></span> <span class="rom">(o·wa·ru)</span> <span class="pos">v.i.</span> <span class="df">to finish; to end; to be over. Intransitive.</span></div>
+<div class="note"><span class="note-lbl">NOTE</span> &nbsp;<span class="xr">Owaru</span> (intrans.): ends of itself. <span class="xr">Oeru</span> (trans.): an agent finishes it.</div>
+<div class="sec">Numbers</div>
+<div class="e"><span class="hw"><ruby>一<rt>いち</rt></ruby></span> <span class="rom">ichi</span> <span class="df">1 &nbsp;•&nbsp;</span><span class="hw"><ruby>二<rt>に</rt></ruby></span> <span class="rom">ni</span> <span class="df">2 &nbsp;•&nbsp;</span><span class="hw"><ruby>三<rt>さん</rt></ruby></span> <span class="rom">san</span> <span class="df">3</span></div>
+<div class="e"><span class="hw"><ruby>四<rt>よん</rt></ruby></span> <span class="rom">yon</span> <span class="df">4 &nbsp;•&nbsp;</span><span class="hw"><ruby>五<rt>ご</rt></ruby></span> <span class="rom">go</span> <span class="df">5 &nbsp;•&nbsp;</span><span class="hw"><ruby>六<rt>ろく</rt></ruby></span> <span class="rom">roku</span> <span class="df">6</span></div>
+<div class="e"><span class="hw"><ruby>七<rt>なな</rt></ruby></span> <span class="rom">nana</span> <span class="df">7 &nbsp;•&nbsp;</span><span class="hw"><ruby>八<rt>はち</rt></ruby></span> <span class="rom">hachi</span> <span class="df">8 &nbsp;•&nbsp;</span><span class="hw"><ruby>九<rt>きゅう</rt></ruby></span> <span class="rom">kyū</span> <span class="df">9</span></div>
+<div class="e"><span class="hw"><ruby>十<rt>じゅう</rt></ruby></span> <span class="rom">jū</span> <span class="df">10 &nbsp;•&nbsp;</span><span class="hw"><ruby>百<rt>ひゃく</rt></ruby></span> <span class="rom">hyaku</span> <span class="df">100 &nbsp;•&nbsp;</span><span class="hw"><ruby>千<rt>せん</rt></ruby></span> <span class="rom">sen</span> <span class="df">1,000</span></div>
+<div class="e"><span class="hw"><ruby>万<rt>まん</rt></ruby></span> <span class="rom">(man)</span> <span class="pos">num.</span> <span class="df">ten thousand; 10,000.</span></div>`
+  },
+
+  /* ── PAGE 2 ── */
+  { range: 'kagi — kuru', pg: 2, letters: ['か','き','く','け','こ'],
+    col1: `
+<div class="sec">か &nbsp;ka</div>
+<div class="e"><span class="hw"><ruby>鍵<rt>かぎ</rt></ruby></span> <span class="rom">(ka·gi)</span> <span class="pos">n.</span> <span class="df">key (for a lock); lock.</span></div>
+<div class="e"><span class="hw"><ruby>書<rt>か</rt>く</ruby></span> <span class="rom">(ka·ku)</span> <span class="pos">v.t.</span> <span class="df">to write; to pen; to compose.</span></div>
+<div class="e"><span class="hw"><ruby>悲<rt>かな</rt>しい</ruby></span> <span class="rom">(ka·na·shī)</span> <span class="pos">adj.</span> <span class="df">sad; sorrowful; melancholy.</span></div>
+<div class="e"><span class="hw"><ruby>彼女<rt>かのじょ</rt></ruby></span> <span class="rom">(ka·no·jo)</span> <span class="pos">pron./n.</span> <span class="df"><span class="sn">1</span> she; her. <span class="sn">2</span> <span class="xr">(colloq.)</span> girlfriend.</span></div>
+<div class="e"><span class="hw"><ruby>簡単<rt>かんたん</rt></ruby></span> <span class="rom">(kan·tan)</span> <span class="pos">adj.</span> <span class="df">easy; simple; uncomplicated.</span></div>
+<div class="e"><span class="hw"><ruby>から</ruby></span> <span class="rom">(ka·ra)</span> <span class="pos">part.</span> <span class="df">because; since; from. Marks reason or starting-point.</span></div>
+<div class="e"><span class="hw"><ruby>彼<rt>かれ</rt></ruby></span> <span class="rom">(ka·re)</span> <span class="pos">pron./n.</span> <span class="df"><span class="sn">1</span> he; him. <span class="sn">2</span> <span class="xr">(colloq.)</span> boyfriend.</span></div>
+<div class="e"><span class="hw"><ruby>傘<rt>かさ</rt></ruby></span> <span class="rom">(ka·sa)</span> <span class="pos">n.</span> <span class="df">umbrella; parasol.</span></div>
+<div class="e"><span class="hw"><ruby>買<rt>か</rt>う</ruby></span> <span class="rom">(ka·u)</span> <span class="pos">v.t.</span> <span class="df">to buy; to purchase; to acquire.</span></div>
+<div class="e"><span class="hw"><ruby>川<rt>かわ</rt></ruby></span> <span class="rom">(ka·wa)</span> <span class="pos">n.</span> <span class="df">river; stream.</span></div>
+<div class="e"><span class="hw"><ruby>家族<rt>かぞく</rt></ruby></span> <span class="rom">(ka·zo·ku)</span> <span class="pos">n.</span> <span class="df">family; one's family members collectively.</span></div>
+<div class="sec">き &nbsp;ki</div>
+<div class="e"><span class="hw"><ruby>聞<rt>き</rt>く</ruby></span> <span class="rom">(ki·ku)</span> <span class="pos">v.t.</span> <span class="df"><span class="sn">1</span> to hear; to listen. <span class="sn">2</span> to ask a question.</span></div>
+<div class="e"><span class="hw"><ruby>昨日<rt>きのう</rt></ruby></span> <span class="rom">(ki·nō)</span> <span class="pos">n.</span> <span class="df">yesterday; the day before today.</span></div>
+<div class="e"><span class="hw"><ruby>今日<rt>きょう</rt></ruby></span> <span class="rom">(kyō)</span> <span class="pos">n.</span> <span class="df">today; the present day.</span></div>
+<div class="e"><span class="hw"><ruby>九<rt>きゅう</rt></ruby></span> <span class="rom">(kyū)</span> <span class="pos">num.</span> <span class="df">nine; 9. Also <span class="xr">ku.</span></span></div>
+<div class="sec">く &nbsp;ku</div>
+<div class="e"><span class="hw"><ruby>靴<rt>くつ</rt></ruby></span> <span class="rom">(ku·tsu)</span> <span class="pos">n.</span> <span class="df">shoes; footwear.</span></div>
+<div class="e"><span class="hw"><ruby>車<rt>くるま</rt></ruby></span> <span class="rom">(ku·ru·ma)</span> <span class="pos">n.</span> <span class="df">car; automobile; vehicle.</span></div>
+<div class="e"><span class="hw"><ruby>来<rt>く</rt>る</ruby></span> <span class="rom">(ku·ru)</span> <span class="pos">v.i.</span> <span class="df">to come; to approach toward the speaker. <span class="xr">Irreg. conj.</span></span></div>`,
+    col2: `
+<div class="sec">け &nbsp;ke</div>
+<div class="e"><span class="hw"><ruby>月<rt>げつ</rt></ruby></span> <span class="rom">(ge·tsu)</span> <span class="pos">n.</span> <span class="df"><span class="sn">1</span> month of the year. <span class="sn">2</span> moon. Also <span class="xr">tsuki.</span></span></div>
+<div class="sec">こ &nbsp;ko</div>
+<div class="e"><span class="hw"><ruby>子供<rt>こども</rt></ruby></span> <span class="rom">(ko·do·mo)</span> <span class="pos">n.</span> <span class="df">child; children; a young person.</span></div>
+<div class="e"><span class="hw"><ruby>ここ</ruby></span> <span class="rom">(ko·ko)</span> <span class="pos">pron.</span> <span class="df">here; this place near speaker.</span></div>
+<div class="e"><span class="hw"><ruby>こんにちは</ruby></span> <span class="rom">(kon·ni·chi·wa)</span> <span class="pos">interj.</span> <span class="df">hello; good afternoon. Standard daytime greeting.</span></div>
+<div class="e"><span class="hw"><ruby>怖<rt>こわ</rt>い</ruby></span> <span class="rom">(ko·wa·i)</span> <span class="pos">adj.</span> <span class="df">scary; frightening; fearful.</span></div>
+<div class="note"><span class="note-lbl">NOTE</span> &nbsp;<span class="xr">Kowai</span> (怖い) = scary/frightening. Do not confuse with <span class="xr">kawaii</span> (可愛い) = cute/adorable.</div>
+<div class="sec">ga/gi/gu/ge/go (voiced)</div>
+<div class="e"><span class="hw"><ruby>学校<rt>がっこう</rt></ruby></span> <span class="rom">(gak·kō)</span> <span class="pos">n.</span> <span class="df">school; educational institution.</span></div>
+<div class="e"><span class="hw"><ruby>学生<rt>がくせい</rt></ruby></span> <span class="rom">(ga·ku·sei)</span> <span class="pos">n.</span> <span class="df">student; pupil (secondary or higher education).</span></div>
+<div class="e"><span class="hw"><ruby>五<rt>ご</rt></ruby></span> <span class="rom">(go)</span> <span class="pos">num.</span> <span class="df">five; 5.</span></div>
+<div class="e"><span class="hw"><ruby>六<rt>ろく</rt></ruby></span> <span class="rom">(ro·ku)</span> <span class="pos">num.</span> <span class="df">six; 6.</span></div>
+<div class="sec">Directions</div>
+<div class="e"><span class="hw"><ruby>左<rt>ひだり</rt></ruby></span> <span class="rom">(hi·da·ri)</span> <span class="pos">n.</span> <span class="df">left; the left-hand side.</span></div>
+<div class="e"><span class="hw"><ruby>右<rt>みぎ</rt></ruby></span> <span class="rom">(mi·gi)</span> <span class="pos">n.</span> <span class="df">right; the right-hand side.</span></div>
+<div class="e"><span class="hw"><ruby>上<rt>うえ</rt></ruby></span> <span class="rom">(u·e)</span> <span class="pos">n.</span> <span class="df">above; up; top.</span></div>
+<div class="e"><span class="hw"><ruby>下<rt>した</rt></ruby></span> <span class="rom">(shi·ta)</span> <span class="pos">n.</span> <span class="df">below; under; bottom.</span></div>
+<div class="e"><span class="hw"><ruby>中<rt>なか</rt></ruby></span> <span class="rom">(na·ka)</span> <span class="pos">n.</span> <span class="df">inside; middle; interior.</span></div>
+<div class="e"><span class="hw"><ruby>外<rt>そと</rt></ruby></span> <span class="rom">(so·to)</span> <span class="pos">n.</span> <span class="df">outside; exterior; outdoors.</span></div>
+<div class="e"><span class="hw"><ruby>隣<rt>となり</rt></ruby></span> <span class="rom">(to·na·ri)</span> <span class="pos">n.</span> <span class="df">next to; next door; neighboring.</span></div>`
+  },
+
+  /* ── PAGE 3 ── */
+  { range: 'samui — soshite', pg: 3, letters: ['さ','し','す','せ','そ'],
+    col1: `
+<div class="sec">さ &nbsp;sa</div>
+<div class="e"><span class="hw"><ruby>寒<rt>さむ</rt>い</ruby></span> <span class="rom">(sa·mu·i)</span> <span class="pos">adj.</span> <span class="df">cold (weather or air); chilly. <span class="xr">Cf. tsumetai.</span></span></div>
+<div class="e"><span class="hw"><ruby>三<rt>さん</rt></ruby></span> <span class="rom">(san)</span> <span class="pos">num.</span> <span class="df">three; 3.</span></div>
+<div class="sec">し &nbsp;shi</div>
+<div class="e"><span class="hw"><ruby>死<rt>し</rt>ぬ</ruby></span> <span class="rom">(shi·nu)</span> <span class="pos">v.i.</span> <span class="df">to die; to pass away; to perish.</span></div>
+<div class="e"><span class="hw"><ruby>知<rt>し</rt>る</ruby></span> <span class="rom">(shi·ru)</span> <span class="pos">v.t.</span> <span class="df">to know; to be aware of; to learn.</span></div>
+<div class="e"><span class="hw"><ruby>下<rt>した</rt></ruby></span> <span class="rom">(shi·ta)</span> <span class="pos">n.</span> <span class="df">below; under; bottom.</span></div>
+<div class="e"><span class="hw"><ruby>週<rt>しゅう</rt></ruby></span> <span class="rom">(shū)</span> <span class="pos">n.</span> <span class="df">week; a period of seven days.</span></div>
+<div class="e"><span class="hw"><ruby>先生<rt>せんせい</rt></ruby></span> <span class="rom">(sen·sei)</span> <span class="pos">n.</span> <span class="df">teacher; instructor; expert. Used as title of address.</span></div>
+<div class="sec">す &nbsp;su</div>
+<div class="e"><span class="hw"><ruby>少<rt>すこ</rt>し</ruby></span> <span class="rom">(su·ko·shi)</span> <span class="pos">adv.</span> <span class="df">a little; a small amount; slightly.</span></div>
+<div class="e"><span class="hw"><ruby>すみません</ruby></span> <span class="rom">(su·mi·ma·sen)</span> <span class="pos">interj.</span> <span class="df">excuse me; I'm sorry; thank you for the trouble.</span></div>
+<div class="e"><span class="hw"><ruby>する</ruby></span> <span class="rom">(su·ru)</span> <span class="pos">v.t.</span> <span class="df">to do; to perform. Turns nouns to verbs. <span class="xr">Irreg.</span></span></div>
+<div class="sec">せ &nbsp;se</div>
+<div class="e"><span class="hw"><ruby>全然<rt>ぜんぜん</rt></ruby></span> <span class="rom">(zen·zen)</span> <span class="pos">adv.</span> <span class="df">not at all; absolutely not. With negative predicates.</span></div>
+<div class="e"><span class="hw"><ruby>千<rt>せん</rt></ruby></span> <span class="rom">(sen)</span> <span class="pos">num.</span> <span class="df">one thousand; 1,000.</span></div>
+<div class="sec">そ &nbsp;so</div>
+<div class="e"><span class="hw"><ruby>そこ</ruby></span> <span class="rom">(so·ko)</span> <span class="pos">pron.</span> <span class="df">there; that place near the listener.</span></div>
+<div class="e"><span class="hw"><ruby>空<rt>そら</rt></ruby></span> <span class="rom">(so·ra)</span> <span class="pos">n.</span> <span class="df">sky; the heavens; open air above.</span></div>
+<div class="e"><span class="hw"><ruby>そして</ruby></span> <span class="rom">(so·shi·te)</span> <span class="pos">conj.</span> <span class="df">and then; and; furthermore.</span></div>
+<div class="e"><span class="hw"><ruby>外<rt>そと</rt></ruby></span> <span class="rom">(so·to)</span> <span class="pos">n.</span> <span class="df">outside; exterior; outdoors.</span></div>`,
+    col2: `
+<div class="sec">た &nbsp;ta</div>
+<div class="e"><span class="hw"><ruby>食<rt>た</rt>べる</ruby></span> <span class="rom">(ta·be·ru)</span> <span class="pos">v.t.</span> <span class="df">to eat; to consume food.</span></div>
+<div class="e"><span class="hw"><ruby>ただ</ruby></span> <span class="rom">(ta·da)</span> <span class="pos">adv./adj.</span> <span class="df"><span class="sn">1</span> just; only; merely. <span class="sn">2</span> free of charge.</span></div>
+<div class="e"><span class="hw"><ruby>高<rt>たか</rt>い</ruby></span> <span class="rom">(ta·ka·i)</span> <span class="pos">adj.</span> <span class="df"><span class="sn">1</span> high; tall. <span class="sn">2</span> expensive; costly.</span></div>
+<div class="e"><span class="hw"><ruby>楽<rt>たの</rt>しい</ruby></span> <span class="rom">(ta·no·shī)</span> <span class="pos">adj.</span> <span class="df">fun; enjoyable; pleasant.</span></div>
+<div class="sec">ち &nbsp;chi</div>
+<div class="e"><span class="hw"><ruby>小<rt>ちい</rt>さい</ruby></span> <span class="rom">(chi·i·sa·i)</span> <span class="pos">adj.</span> <span class="df">small; little in size.</span></div>
+<div class="sec">つ &nbsp;tsu</div>
+<div class="e"><span class="hw"><ruby>使<rt>つか</rt>う</ruby></span> <span class="rom">(tsu·ka·u)</span> <span class="pos">v.t.</span> <span class="df">to use; to make use of.</span></div>
+<div class="e"><span class="hw"><ruby>机<rt>つくえ</rt></ruby></span> <span class="rom">(tsu·ku·e)</span> <span class="pos">n.</span> <span class="df">desk; writing table.</span></div>
+<div class="e"><span class="hw"><ruby>作<rt>つく</rt>る</ruby></span> <span class="rom">(tsu·ku·ru)</span> <span class="pos">v.t.</span> <span class="df">to make; to create; to build.</span></div>
+<div class="e"><span class="hw"><ruby>冷<rt>つめ</rt>たい</ruby></span> <span class="rom">(tsu·me·ta·i)</span> <span class="pos">adj.</span> <span class="df">cold (object or surface). <span class="xr">Cf. samui.</span></span></div>
+<div class="sec">て &nbsp;te</div>
+<div class="e"><span class="hw"><ruby>店員<rt>てんいん</rt></ruby></span> <span class="rom">(ten·in)</span> <span class="pos">n.</span> <span class="df">shop clerk; store assistant; salesperson.</span></div>
+<div class="e"><span class="hw"><ruby>電話<rt>でんわ</rt></ruby></span> <span class="rom">(den·wa)</span> <span class="pos">n.</span> <span class="df">telephone; phone call.</span></div>
+<div class="e"><span class="hw"><ruby>でも</ruby></span> <span class="rom">(de·mo)</span> <span class="pos">conj.</span> <span class="df">but; however; nevertheless.</span></div>
+<div class="sec">と &nbsp;to</div>
+<div class="e"><span class="hw"><ruby>時<rt>とき</rt></ruby></span> <span class="rom">(to·ki)</span> <span class="pos">n.</span> <span class="df">time; moment; occasion.</span></div>
+<div class="e"><span class="hw"><ruby>友達<rt>ともだち</rt></ruby></span> <span class="rom">(to·mo·da·chi)</span> <span class="pos">n.</span> <span class="df">friend; companion; comrade.</span></div>
+<div class="e"><span class="hw"><ruby>鳥<rt>とり</rt></ruby></span> <span class="rom">(to·ri)</span> <span class="pos">n.</span> <span class="df">bird; fowl.</span></div>
+<div class="e"><span class="hw"><ruby>撮<rt>と</rt>る</ruby></span> <span class="rom">(to·ru)</span> <span class="pos">v.t.</span> <span class="df">to take a photograph; to shoot.</span></div>
+<div class="e"><span class="hw"><ruby>年<rt>とし</rt></ruby></span> <span class="rom">(to·shi)</span> <span class="pos">n.</span> <span class="df">year; age.</span></div>
+<div class="e"><span class="hw"><ruby>とても</ruby></span> <span class="rom">(to·te·mo)</span> <span class="pos">adv.</span> <span class="df">very; extremely; quite.</span></div>`
+  },
+
+  /* ── PAGE 4 ── */
+  { range: 'nagai — nomu', pg: 4, letters: ['た','ち','つ','て','と'],
+    col1: `
+<div class="sec">な &nbsp;na</div>
+<div class="e"><span class="hw"><ruby>長<rt>なが</rt>い</ruby></span> <span class="rom">(na·ga·i)</span> <span class="pos">adj.</span> <span class="df">long (length or duration); lengthy.</span></div>
+<div class="e"><span class="hw"><ruby>中<rt>なか</rt></ruby></span> <span class="rom">(na·ka)</span> <span class="pos">n.</span> <span class="df">inside; interior; middle; among.</span></div>
+<div class="e"><span class="hw"><ruby>泣<rt>な</rt>く</ruby></span> <span class="rom">(na·ku)</span> <span class="pos">v.i.</span> <span class="df">to cry; to weep; to shed tears.</span></div>
+<div class="e"><span class="hw"><ruby>名前<rt>なまえ</rt></ruby></span> <span class="rom">(na·ma·e)</span> <span class="pos">n.</span> <span class="df">name; given or full name.</span></div>
+<div class="e"><span class="hw"><ruby>何<rt>なに</rt></ruby></span> <span class="rom">(na·ni)</span> <span class="pos">pron.</span> <span class="df">what. Interrogative. <span class="xr">Nani mo,</span> nothing at all.</span></div>
+<div class="e"><span class="hw"><ruby>なぜ</ruby></span> <span class="rom">(na·ze)</span> <span class="pos">adv.</span> <span class="df">why; for what reason. Interrogative.</span></div>
+<div class="e"><span class="hw"><ruby>七<rt>なな</rt></ruby></span> <span class="rom">(na·na)</span> <span class="pos">num.</span> <span class="df">seven; 7. Also <span class="xr">shichi.</span></span></div>
+<div class="sec">に &nbsp;ni</div>
+<div class="e"><span class="hw"><ruby>日本<rt>にほん</rt></ruby></span> <span class="rom">(ni·hon)</span> <span class="pos">n.</span> <span class="df">Japan; the Japanese nation. Also <span class="xr">nippon.</span></span></div>
+<div class="e"><span class="hw"><ruby>二<rt>に</rt></ruby></span> <span class="rom">(ni)</span> <span class="pos">num.</span> <span class="df">two; 2.</span></div>
+<div class="sec">ぬ &nbsp;nu</div>
+<div class="e"><span class="hw"><ruby>盗<rt>ぬす</rt>む</ruby></span> <span class="rom">(nu·su·mu)</span> <span class="pos">v.t.</span> <span class="df">to steal; to take without permission.</span></div>
+<div class="sec">ね &nbsp;ne</div>
+<div class="e"><span class="hw"><ruby>猫<rt>ねこ</rt></ruby></span> <span class="rom">(ne·ko)</span> <span class="pos">n.</span> <span class="df">cat; domestic feline.</span></div>
+<div class="e"><span class="hw"><ruby>寝<rt>ね</rt>る</ruby></span> <span class="rom">(ne·ru)</span> <span class="pos">v.i.</span> <span class="df">to sleep; to go to bed; to lie down.</span></div>
+<div class="sec">の &nbsp;no</div>
+<div class="e"><span class="hw"><ruby>飲<rt>の</rt>む</ruby></span> <span class="rom">(no·mu)</span> <span class="pos">v.t.</span> <span class="df">to drink; to swallow a liquid.</span></div>
+<div class="note"><span class="note-lbl">NOTE</span> &nbsp;<span class="xr">Nomu</span> covers all drinkable liquids incl. oral medicine. <span class="xr">Cf. taberu</span> for solids.</div>
+<div class="sec">は &nbsp;ha</div>
+<div class="e"><span class="hw"><ruby>はい</ruby></span> <span class="rom">(ha·i)</span> <span class="pos">interj.</span> <span class="df">yes; correct; acknowledgment.</span></div>
+<div class="e"><span class="hw"><ruby>始<rt>はじ</rt>まる</ruby></span> <span class="rom">(ha·ji·ma·ru)</span> <span class="pos">v.i.</span> <span class="df">to begin; to start; to commence. Intransitive.</span></div>
+<div class="e"><span class="hw"><ruby>話<rt>はな</rt>す</ruby></span> <span class="rom">(ha·na·su)</span> <span class="pos">v.t./i.</span> <span class="df">to speak; to talk; to converse.</span></div>
+<div class="e"><span class="hw"><ruby>走<rt>はし</rt>る</ruby></span> <span class="rom">(ha·shi·ru)</span> <span class="pos">v.i.</span> <span class="df">to run; to move quickly on foot.</span></div>
+<div class="e"><span class="hw"><ruby>早<rt>はや</rt>い</ruby></span> <span class="rom">(ha·ya·i)</span> <span class="pos">adj.</span> <span class="df"><span class="sn">1</span> fast; swift. <span class="sn">2</span> early in the day.</span></div>`,
+    col2: `
+<div class="sec">ひ &nbsp;hi</div>
+<div class="e"><span class="hw"><ruby>昼<rt>ひる</rt></ruby></span> <span class="rom">(hi·ru)</span> <span class="pos">n.</span> <span class="df">daytime; noon; midday.</span></div>
+<div class="e"><span class="hw"><ruby>人<rt>ひと</rt></ruby></span> <span class="rom">(hi·to)</span> <span class="pos">n.</span> <span class="df">person; human being; individual.</span></div>
+<div class="e"><span class="hw"><ruby>百<rt>ひゃく</rt></ruby></span> <span class="rom">(hya·ku)</span> <span class="pos">num.</span> <span class="df">one hundred; 100.</span></div>
+<div class="sec">ほ &nbsp;ho</div>
+<div class="e"><span class="hw"><ruby>本<rt>ほん</rt></ruby></span> <span class="rom">(hon)</span> <span class="pos">n.</span> <span class="df">book; volume; reading material.</span></div>
+<div class="e"><span class="hw"><ruby>部屋<rt>へや</rt></ruby></span> <span class="rom">(he·ya)</span> <span class="pos">n.</span> <span class="df">room; chamber.</span></div>
+<div class="sec">ま &nbsp;ma</div>
+<div class="e"><span class="hw"><ruby>毎日<rt>まいにち</rt></ruby></span> <span class="rom">(mai·ni·chi)</span> <span class="pos">n./adv.</span> <span class="df">every day; daily.</span></div>
+<div class="e"><span class="hw"><ruby>また</ruby></span> <span class="rom">(ma·ta)</span> <span class="pos">adv.</span> <span class="df">again; once more; also.</span></div>
+<div class="e"><span class="hw"><ruby>待<rt>ま</rt>つ</ruby></span> <span class="rom">(ma·tsu)</span> <span class="pos">v.t./i.</span> <span class="df">to wait (for); to await.</span></div>
+<div class="sec">み &nbsp;mi</div>
+<div class="e"><span class="hw"><ruby>道<rt>みち</rt></ruby></span> <span class="rom">(mi·chi)</span> <span class="pos">n.</span> <span class="df">road; street; path; way.</span></div>
+<div class="e"><span class="hw"><ruby>短<rt>みじか</rt>い</ruby></span> <span class="rom">(mi·ji·ka·i)</span> <span class="pos">adj.</span> <span class="df">short (length or time); brief.</span></div>
+<div class="e"><span class="hw"><ruby>店<rt>みせ</rt></ruby></span> <span class="rom">(mi·se)</span> <span class="pos">n.</span> <span class="df">shop; store; establishment.</span></div>
+<div class="e"><span class="hw"><ruby>見<rt>み</rt>る</ruby></span> <span class="rom">(mi·ru)</span> <span class="pos">v.t.</span> <span class="df">to see; to watch; to observe.</span></div>
+<div class="e"><span class="hw"><ruby>水<rt>みず</rt></ruby></span> <span class="rom">(mi·zu)</span> <span class="pos">n.</span> <span class="df">water; cold water.</span></div>
+<div class="sec">む &nbsp;mu / も &nbsp;mo</div>
+<div class="e"><span class="hw"><ruby>難<rt>むずか</rt>しい</ruby></span> <span class="rom">(mu·zu·ka·shī)</span> <span class="pos">adj.</span> <span class="df">difficult; hard; challenging.</span></div>
+<div class="e"><span class="hw"><ruby>持<rt>も</rt>つ</ruby></span> <span class="rom">(mo·tsu)</span> <span class="pos">v.t.</span> <span class="df">to hold; to carry; to have in hand.</span></div>
+<div class="e"><span class="hw"><ruby>もっと</ruby></span> <span class="rom">(mot·to)</span> <span class="pos">adv.</span> <span class="df">more; to a greater extent.</span></div>
+<div class="e"><span class="hw"><ruby>万<rt>まん</rt></ruby></span> <span class="rom">(man)</span> <span class="pos">num.</span> <span class="df">ten thousand; 10,000.</span></div>`
+  },
+
+  /* ── PAGE 5 ── */
+  { range: 'yama — zutto', pg: 5, letters: ['な','に','ぬ','ね','の'],
+    col1: `
+<div class="sec">や &nbsp;ya</div>
+<div class="e"><span class="hw"><ruby>山<rt>やま</rt></ruby></span> <span class="rom">(ya·ma)</span> <span class="pos">n.</span> <span class="df">mountain; hill; peak.</span></div>
+<div class="e"><span class="hw"><ruby>安<rt>やす</rt>い</ruby></span> <span class="rom">(ya·su·i)</span> <span class="pos">adj.</span> <span class="df">cheap; inexpensive; affordable.</span></div>
+<div class="sec">よ &nbsp;yo</div>
+<div class="e"><span class="hw"><ruby>読<rt>よ</rt>む</ruby></span> <span class="rom">(yo·mu)</span> <span class="pos">v.t.</span> <span class="df">to read; to peruse text or books.</span></div>
+<div class="e"><span class="hw"><ruby>四<rt>よん</rt></ruby></span> <span class="rom">(yon)</span> <span class="pos">num.</span> <span class="df">four; 4. Also <span class="xr">shi</span> (avoid in some contexts).</span></div>
+<div class="e"><span class="hw"><ruby>夜<rt>よる</rt></ruby></span> <span class="rom">(yo·ru)</span> <span class="pos">n.</span> <span class="df">night; nighttime; the evening hours.</span></div>
+<div class="sec">ら &nbsp;ra</div>
+<div class="e"><span class="hw"><ruby>楽<rt>らく</rt></ruby></span> <span class="rom">(ra·ku)</span> <span class="pos">adj./n.</span> <span class="df">comfortable; easy; relaxed.</span></div>
+<div class="sec">わ &nbsp;wa</div>
+<div class="e"><span class="hw"><ruby>私<rt>わたし</rt></ruby></span> <span class="rom">(wa·ta·shi)</span> <span class="pos">pron.</span> <span class="df">I; me. Standard polite first-person; used by both genders.</span></div>
+<div class="e"><span class="hw"><ruby>悪<rt>わる</rt>い</ruby></span> <span class="rom">(wa·ru·i)</span> <span class="pos">adj.</span> <span class="df">bad; wrong; poor; evil.</span></div>
+<div class="e"><span class="hw"><ruby>笑<rt>わら</rt>う</ruby></span> <span class="rom">(wa·ra·u)</span> <span class="pos">v.i.</span> <span class="df">to laugh; to smile; to chuckle.</span></div>
+<div class="e"><span class="hw"><ruby>分<rt>わ</rt>かりません</ruby></span> <span class="rom">(wa·ka·ri·ma·sen)</span> <span class="pos">phr.</span> <span class="df">I don't understand; I don't know. Polite neg. of <span class="xr">wakaru.</span></span></div>
+<div class="sec">Interrogatives</div>
+<div class="e"><span class="hw"><ruby>誰<rt>だれ</rt></ruby></span> <span class="rom">(da·re)</span> <span class="pos">pron.</span> <span class="df">who; which person.</span></div>
+<div class="e"><span class="hw"><ruby>何<rt>なに</rt></ruby></span> <span class="rom">(na·ni)</span> <span class="pos">pron.</span> <span class="df">what; what thing.</span></div>
+<div class="e"><span class="hw"><ruby>どこ</ruby></span> <span class="rom">(do·ko)</span> <span class="pos">pron.</span> <span class="df">where; what place.</span></div>
+<div class="e"><span class="hw"><ruby>いつ</ruby></span> <span class="rom">(i·tsu)</span> <span class="pos">pron.</span> <span class="df">when; what time.</span></div>
+<div class="e"><span class="hw"><ruby>なぜ</ruby></span> <span class="rom">(na·ze)</span> <span class="pos">adv.</span> <span class="df">why; for what reason.</span></div>
+<div class="e"><span class="hw"><ruby>どれ</ruby></span> <span class="rom">(do·re)</span> <span class="pos">pron.</span> <span class="df">which one (of three or more).</span></div>
+<div class="e"><span class="hw"><ruby>どう</ruby></span> <span class="rom">(dō)</span> <span class="pos">adv.</span> <span class="df">how; in what way.</span></div>`,
+    col2: `
+<div class="sec">Time &amp; Days</div>
+<div class="e"><span class="hw"><ruby>今<rt>いま</rt></ruby></span> <span class="rom">ima</span> <span class="df">now &nbsp;•&nbsp;</span><span class="hw"><ruby>今日<rt>きょう</rt></ruby></span> <span class="rom">kyō</span> <span class="df">today</span></div>
+<div class="e"><span class="hw"><ruby>明日<rt>あした</rt></ruby></span> <span class="rom">ashita</span> <span class="df">tomorrow &nbsp;•&nbsp;</span><span class="hw"><ruby>昨日<rt>きのう</rt></ruby></span> <span class="rom">kinō</span> <span class="df">yesterday</span></div>
+<div class="e"><span class="hw"><ruby>朝<rt>あさ</rt></ruby></span> <span class="rom">asa</span> <span class="df">morning &nbsp;•&nbsp;</span><span class="hw"><ruby>昼<rt>ひる</rt></ruby></span> <span class="rom">hiru</span> <span class="df">noon</span></div>
+<div class="e"><span class="hw"><ruby>夜<rt>よる</rt></ruby></span> <span class="rom">yoru</span> <span class="df">night &nbsp;•&nbsp;</span><span class="hw"><ruby>毎日<rt>まいにち</rt></ruby></span> <span class="rom">mainichi</span> <span class="df">every day</span></div>
+<div class="e"><span class="hw"><ruby>週<rt>しゅう</rt></ruby></span> <span class="rom">shū</span> <span class="df">week &nbsp;•&nbsp;</span><span class="hw"><ruby>月<rt>げつ</rt></ruby></span> <span class="rom">getsu</span> <span class="df">month</span></div>
+<div class="e"><span class="hw"><ruby>年<rt>とし</rt></ruby></span> <span class="rom">toshi</span> <span class="df">year &nbsp;•&nbsp;</span><span class="hw"><ruby>時<rt>とき</rt></ruby></span> <span class="rom">toki</span> <span class="df">time/moment</span></div>
+<div class="sec">Adverbs</div>
+<div class="e"><span class="hw"><ruby>とても</ruby></span> <span class="rom">(to·te·mo)</span> <span class="pos">adv.</span> <span class="df">very; extremely; quite.</span></div>
+<div class="e"><span class="hw"><ruby>少<rt>すこ</rt>し</ruby></span> <span class="rom">(su·ko·shi)</span> <span class="pos">adv.</span> <span class="df">a little; slightly.</span></div>
+<div class="e"><span class="hw"><ruby>全然<rt>ぜんぜん</rt></ruby></span> <span class="rom">(zen·zen)</span> <span class="pos">adv.</span> <span class="df">not at all. With neg. predicate.</span></div>
+<div class="e"><span class="hw"><ruby>また</ruby></span> <span class="rom">(ma·ta)</span> <span class="pos">adv.</span> <span class="df">again; also.</span></div>
+<div class="e"><span class="hw"><ruby>もっと</ruby></span> <span class="rom">(mot·to)</span> <span class="pos">adv.</span> <span class="df">more; to a greater extent.</span></div>
+<div class="e"><span class="hw"><ruby>ずっと</ruby></span> <span class="rom">(zut·to)</span> <span class="pos">adv.</span> <span class="df">all the time; always; the whole time.</span></div>
+<div class="e"><span class="hw"><ruby>ただ</ruby></span> <span class="rom">(ta·da)</span> <span class="pos">adv.</span> <span class="df">just; only; merely. Also: free of charge.</span></div>
+<div class="sec">Pronouns (place)</div>
+<div class="e"><span class="hw"><ruby>ここ</ruby></span> <span class="rom">koko</span> <span class="df">here (near speaker)</span></div>
+<div class="e"><span class="hw"><ruby>そこ</ruby></span> <span class="rom">soko</span> <span class="df">there (near listener)</span></div>
+<div class="e"><span class="hw"><ruby>あそこ</ruby></span> <span class="rom">asoko</span> <span class="df">over there (far from both)</span></div>
+<div class="e"><span class="hw"><ruby>どこ</ruby></span> <span class="rom">doko</span> <span class="df">where? (interrogative)</span></div>
+<div class="note"><span class="note-lbl">USAGE</span> &nbsp;Place pronouns follow the <span class="xr">ko-so-a-do</span> series: <span class="xr">ko-</span> = near speaker, <span class="xr">so-</span> = near listener, <span class="xr">a-</span> = far from both, <span class="xr">do-</span> = interrogative.</div>`
+  }
+];
+
+/* ═══════════════════════════════════════════════
+   TAB DATA — one entry per page, 5 letters each
+   spreadIndex: which two-page spread to show
+   On wide screens: all tabs along top edge.
+   On narrow screens: tabs for the current spread
+     on the left (odd spread) or right (even spread) side.
+═══════════════════════════════════════════════ */
+const TOTAL_PAGES   = PAGES.length;
+const TOTAL_SPREADS = Math.ceil(TOTAL_PAGES / 2);
+let spreadIndex = 0;
+
+/* ── Build top tabs (wide) ── */
+(function buildTopTabs() {
+  const bar = document.getElementById('tabs-top');
+  PAGES.forEach((p, pageIdx) => {
+    const grp = document.createElement('div');
+    grp.className = 'tab-group';
+    p.letters.forEach(kana => {
+      const btn = document.createElement('button');
+      btn.className = 'tab tab-top';
+      btn.dataset.page = pageIdx;
+      btn.dataset.spread = Math.floor(pageIdx / 2);
+      btn.textContent = kana;
+      btn.onclick = () => { spreadIndex = Math.floor(pageIdx / 2); render(); };
+      grp.appendChild(btn);
+    });
+    bar.appendChild(grp);
+  });
+})();
+
+/* ── Build side tabs (narrow) — rebuilt on each render ── */
+function buildSideTabs() {
+  const side = document.getElementById('tabs-side');
+  side.innerHTML = '';
+  /* Show tabs for the current spread's page(s) only */
+  const pageIdxs = [spreadIndex * 2, spreadIndex * 2 + 1].filter(i => PAGES[i]);
+  /* Side: right side for odd spreads, left for even — just pick one consistent side */
+  const onRight = spreadIndex % 2 === 0;
+  side.className = onRight ? 'side-right' : 'side-left';
+  const shapeClass = onRight ? 'tab-side-right' : 'tab-side-left';
+
+  /* Gather all letters across both pages of the spread */
+  pageIdxs.forEach(pageIdx => {
+    PAGES[pageIdx].letters.forEach(kana => {
+      const btn = document.createElement('button');
+      btn.className = `tab ${shapeClass}`;
+      btn.dataset.page = pageIdx;
+      btn.dataset.spread = spreadIndex;
+      btn.textContent = kana;
+      btn.onclick = () => { render(); };   /* already on this spread */
+      side.appendChild(btn);
+    });
+  });
+  /* Mark all as active since we only show current spread's tabs */
+  side.querySelectorAll('.tab').forEach(b => b.classList.add('active'));
+}
+
+function buildPage(pageData, side) {
+  return `<div class="page ${side}">
+    <div class="page-header">
+      <span class="hw-range">${pageData.range}</span>
+      <span class="pg">${pageData.pg}</span>
+    </div>
+    <div class="cols">
+      <div class="col">${pageData.col1}</div>
+      <div class="col">${pageData.col2}</div>
+    </div>
+  </div>`;
+}
+
+function render() {
+  const spread   = document.getElementById('spread');
+  const leftIdx  = spreadIndex * 2;
+  const rightIdx = leftIdx + 1;
+  const narrow   = window.matchMedia('(max-width: 560px)').matches;
+
+  /* Pages */
+  let html = '';
+  if (PAGES[leftIdx])             html += buildPage(PAGES[leftIdx],  'left');
+  if (!narrow && PAGES[rightIdx]) html += buildPage(PAGES[rightIdx], 'right');
+  spread.classList.toggle('two-pages', !narrow && !!PAGES[rightIdx]);
+  spread.innerHTML = html;
+
+  /* Indicator */
+  const indicator = document.getElementById('indicator');
+  if (!narrow && PAGES[rightIdx]) {
+    indicator.textContent = `pp. ${leftIdx+1}–${rightIdx+1} of ${TOTAL_PAGES}`;
+  } else {
+    indicator.textContent = `p. ${leftIdx+1} of ${TOTAL_PAGES}`;
+  }
+
+  /* Nav buttons */
+  document.getElementById('btn-prev').disabled = spreadIndex === 0;
+  document.getElementById('btn-next').disabled = spreadIndex >= TOTAL_SPREADS - 1;
+
+  /* Top tabs: highlight active spread's group */
+  document.querySelectorAll('#tabs-top .tab').forEach(btn => {
+    btn.classList.toggle('active', +btn.dataset.spread === spreadIndex);
+  });
+
+  /* Side tabs: rebuild for current spread */
+  buildSideTabs();
+}
+
+function turn(dir) {
+  spreadIndex = Math.max(0, Math.min(TOTAL_SPREADS - 1, spreadIndex + dir));
+  render();
+}
+
+window.addEventListener('resize', render);
+render();
+</script>
+</body>
+</html>
