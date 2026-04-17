@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Kotoba - Home</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            background: #FFFFFF;
+        }
+
+        .viewport {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .home-page {
+            position: relative;
+            width: 1440px;
+            height: 1024px;
+            background: #FFFFFF;
+            transform-origin: center center;
+            flex-shrink: 0;
+        }
+
+        .home-page > div {
+            background-repeat: no-repeat;
+            background-size: contain;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .bunny-cards,
+        .cds,
+        .settings {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, top 0.3s ease;
+        }
+
+        .home-page.menu-open .bunny-cards,
+        .home-page.menu-open .cds,
+        .home-page.menu-open .settings {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .home-page.menu-open .cds {
+            top: 189px;
+        }
+
+        .home-page.menu-open .settings {
+            top: 276px;
+        }
+
+        .arrow {
+            cursor: pointer;
+            transition: top 0.3s ease, transform 0.3s ease;
+        }
+
+        .cd-player {
+            z-index: 5;
+        }
+
+        .disk {
+            cursor: pointer;
+        }
+
+        .table {
+            position: absolute;
+            width: 1440px;
+            height: 932px;
+            left: 0px;
+            top: 47px;
+            background-image: url("assets/home/table.png");
+            display: none;
+        }
+
+        .playlist-intro {
+            position: absolute;
+            width: 273px;
+            height: 240px;
+            left: 872px;
+            top: 409px;
+            background-image: url("assets/home/case.png");
+            display: none;
+        }
+
+        .home-page.first-visit {
+            cursor: pointer;
+        }
+
+        .home-page.first-visit > div {
+            display: none;
+        }
+
+        .home-page.first-visit .table,
+        .home-page.first-visit .playlist-intro,
+        .home-page.first-visit .disk,
+        .home-page.first-visit .playlist-bubble {
+            display: block;
+        }
+
+        .home-page.first-visit .playlist-bubble {
+            opacity: 1;
+            left: 872px;
+            top: 378px;
+        }
+
+        .home-page.menu-open .arrow {
+            top: 367px;
+            transform: rotate(180deg);
+        }
+
+        .desktop-bubble,
+        .notes-bubble,
+        .playlist-bubble,
+        .dictionary-bubble,
+        .photocard-bubble,
+        .enter-cd-bubble {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+            z-index: 100;
+        }
+
+        .laptop:hover ~ .desktop-bubble,
+        .notes:hover ~ .notes-bubble,
+        .photocards:hover ~ .photocard-bubble,
+        .cd-player:hover ~ .enter-cd-bubble,
+        .disk:hover ~ .playlist-bubble,
+        .dictionary:hover ~ .dictionary-bubble {
+            opacity: 1;
+        }
+
+        .desktop {
+            position: absolute;
+            width: 1440px;
+            height: 933px;
+            left: 0px;
+            top: 45px;
+            background-image: url("assets/home/desktop.png");
+        }
+
+        .laptop {
+            position: absolute;
+            width: 521px;
+            height: 719px;
+            left: 199px;
+            top: 206px;
+            background-image: url("assets/home/laptop.png");
+            z-index: 6;
+        }
+
+        .notes {
+            position: absolute;
+            width: 194px;
+            height: 211px;
+            left: 702px;
+            top: 438px;
+            background-image: url("assets/home/notes.png");
+        }
+
+        .photocards {
+            position: absolute;
+            width: 355px;
+            height: 417px;
+            left: 994px;
+            top: 561px;
+            background-image: url("assets/home/photocards.png");
+        }
+
+        .dictionary {
+            position: absolute;
+            width: 296px;
+            height: 372px;
+            left: 742px;
+            top: 606px;
+            background-image: url("assets/home/dictionary.png");
+        }
+
+        .case {
+            position: absolute;
+            width: 273px;
+            height: 240px;
+            left: 872px;
+            top: 409px;
+            background-image: url("assets/home/case.png");
+        }
+
+        .disk {
+            position: absolute;
+            width: 273px;
+            height: 240px;
+            left: 872px;
+            top: 409px;
+            background-image: url("assets/home/disk.png");
+        }
+
+        .settings {
+            position: absolute;
+            width: 95px;
+            height: 91px;
+            left: 1315px;
+            top: 45px;
+            background-image: url("assets/home/settings.png");
+        }
+
+        .arrow {
+            position: absolute;
+            width: 64px;
+            height: 62px;
+            left: 1333px;
+            top: 45px;
+            background-image: url("assets/home/arrow.png");
+        }
+
+        .cds {
+            position: absolute;
+            width: 125px;
+            height: 87px;
+            left: 1315px;
+            top: 45px;
+            background-image: url("assets/home/cds.png");
+        }
+
+        .bunny-cards {
+            position: absolute;
+            width: 147px;
+            height: 144px;
+            left: 1293px;
+            top: 45px;
+            background-image: url("assets/home/bunny cards.png");
+        }
+
+        .photocard-bubble {
+            position: absolute;
+            width: 252px;
+            height: 118px;
+            left: 1063px;
+            top: 640px;
+            background-image: url("assets/home/photocard bubble.png");
+        }
+
+        .dictionary-bubble {
+            position: absolute;
+            width: 239px;
+            height: 113px;
+            left: 769px;
+            top: 673px;
+            background-image: url("assets/home/dictionary bubble.png");
+        }
+
+        .playlist-bubble {
+            position: absolute;
+            width: 245.73px;
+            height: 111.72px;
+            left: 871.27px;
+            top: 384.63px;
+            background-image: url("assets/home/playlist bubble.png");
+            transform: rotate(0.19deg);
+        }
+
+        .notes-bubble {
+            position: absolute;
+            width: 117px;
+            height: 85px;
+            left: 727px;
+            top: 394px;
+            background-image: url("assets/home/notes bubble.png");
+        }
+
+        .enter-cd-bubble {
+            position: absolute;
+            width: 217px;
+            height: 108px;
+            left: 27px;
+            top: 713px;
+            background-image: url("assets/home/enter CD bubble.png");
+        }
+
+        .desktop-bubble {
+            position: absolute;
+            width: 246px;
+            height: 104px;
+            left: 327px;
+            top: 142px;
+            background-image: url("assets/home/desktop bubble.png");
+        }
+
+        .points {
+            position: absolute;
+            width: 244px;
+            height: 97px;
+            left: 0px;
+            top: 45px;
+            background-image: url("assets/home/points.png");
+        }
+
+        .cd-player {
+            position: absolute;
+            width: 306px;
+            height: 305px;
+            left: 0px;
+            top: 673px;
+            background-image: url("assets/home/cd_player.png");
+        }
+    </style>
+</head>
+<body>
+    <div class="viewport">
+    <div class="home-page">
+        <div class="table"></div>
+        <div class="playlist-intro"></div>
+        <div class="desktop"></div>
+        <div class="dictionary"></div>
+        <div class="laptop"></div>
+        <div class="notes"></div>
+        <div class="photocards"></div>
+        <div class="case"></div>
+        <div class="disk"></div>
+        <div class="cd-player"></div>
+        <div class="points"></div>
+        <div class="bunny-cards"></div>
+        <div class="cds"></div>
+        <div class="settings"></div>
+        <div class="arrow"></div>
+        <div class="desktop-bubble"></div>
+        <div class="notes-bubble"></div>
+        <div class="playlist-bubble"></div>
+        <div class="dictionary-bubble"></div>
+        <div class="photocard-bubble"></div>
+        <div class="enter-cd-bubble"></div>
+    </div>
+    </div>
+    <script>
+        function scaleContent() {
+            const scale = Math.min(window.innerWidth / 1440, window.innerHeight / 1024);
+            document.querySelector('.home-page').style.transform = `scale(${scale})`;
+        }
+        window.addEventListener('resize', scaleContent);
+        scaleContent();
+
+        const homePage = document.querySelector('.home-page');
+        document.querySelector('.arrow').addEventListener('click', () => {
+            homePage.classList.toggle('menu-open');
+        });
+
+        document.querySelector('.disk').addEventListener('click', () => {
+            localStorage.setItem('kotoba-visited', '1');
+            window.location.href = 'diskbox.html';
+        });
+
+        if (window.location.search.includes('reset')) {
+            localStorage.removeItem('kotoba-visited');
+        }
+
+        if (!localStorage.getItem('kotoba-visited')) {
+            homePage.classList.add('first-visit');
+        }
+
+    </script>
+</body>
+</html>
