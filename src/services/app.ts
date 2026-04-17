@@ -109,6 +109,7 @@ import {
   listNotes,
   getNoteCount,
   deleteNote,
+  deleteAllNotes,
   searchNotes,
 } from "../domains/notes/service";
 
@@ -119,6 +120,7 @@ export const notes = {
   list: listNotes,
   getCount: getNoteCount,
   delete: deleteNote,
+  deleteAll: deleteAllNotes,
   search: searchNotes,
 } as const;
 
@@ -129,6 +131,7 @@ export const notes = {
 import {
   startQuiz,
   submitQuizAnswer,
+  submitQuizAnswerAndContinue,
   getSession,
   getCurrentQuestion,
   getActiveSessions,
@@ -150,6 +153,7 @@ export const rewards = {
   // Quiz
   startQuiz,
   submitQuizAnswer,
+  submitQuizAnswerAndContinue,
   getSession,
   getCurrentQuestion,
   getActiveSessions,

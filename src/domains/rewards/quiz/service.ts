@@ -69,6 +69,8 @@ export async function getCurrentQuestion(
 export interface AnswerResult {
   correct: boolean;
   correctOptionIndex: number;
+  /** Question that was just answered (useful for wrong-answer lookup UI). */
+  question: QuizQuestion;
   /** Whether the session is now complete (no more questions). */
   sessionComplete: boolean;
   session: QuizSession;
@@ -117,6 +119,7 @@ export async function submitAnswer(
   return {
     correct,
     correctOptionIndex,
+    question,
     sessionComplete,
     session: updated,
   };

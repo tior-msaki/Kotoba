@@ -101,6 +101,11 @@ export async function deleteNote(id: string): Promise<void> {
   await db.notes.delete(id);
 }
 
+/** Delete all notes (mass discard). */
+export async function deleteAllNotes(): Promise<void> {
+  await db.notes.clear();
+}
+
 // ---------------------------------------------------------------------------
 // Search
 // ---------------------------------------------------------------------------

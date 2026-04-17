@@ -15,6 +15,7 @@ import {
 import type { AnswerResult } from "./quiz/service";
 import { earnFromQuiz, getBalance } from "./currency/service";
 import { getCollectionProgress } from "./gacha/service";
+import type { DictionaryEntry } from "../dictionary/types";
 
 // ---------------------------------------------------------------------------
 // Quiz — with currency wiring
@@ -36,6 +37,50 @@ export async function submitQuizAnswer(
     currencyAwarded = 1;
   }
   return { ...result, currencyAwarded };
+}
+
+/**
+ * Perpetual quiz helper:
+ * - Submit answer
+ * - Award currency on correct
+ * - If this question ended the session, immediately create a new one
+ *   from the same dictionary pool so the user can keep going until they exit.
+ */
+export async function submitQuizAnswerAndContinue(
+  sessionId: string,
+  selectedOptionIndex: number,
+  dictionaryEntries: DictionaryEntry[],
+  questionCount = 10
+): Promise<
+  (AnswerResult & {
+    currencyAwarded: number;
+    lookupOnWrong?: { dictionaryEntryId: string; prompt: string };
+  }) & { nextSessionId?: string }
+> {
+  const result = await submitAnswer(sessionId, selectedOptionIndex);
+  let currencyAwarded = 0;
+  if (result.correct) {
+    await earnFromQuiz();
+    currencyAwarded = 1;
+  }
+
+  let nextSessionId: string | undefined;
+  if (result.sessionComplete) {
+    const next = await startSession(dictionaryEntries, questionCount);
+    nextSessionId = next?.id;
+  }
+
+  return {
+    ...result,
+    currencyAwarded,
+    nextSessionId,
+    lookupOnWrong: result.correct
+      ? undefined
+      : {
+          dictionaryEntryId: result.question.dictionaryEntryId,
+          prompt: result.question.prompt,
+        },
+  };
 }
 
 // ---------------------------------------------------------------------------
