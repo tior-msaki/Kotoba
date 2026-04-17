@@ -202,6 +202,16 @@
             left: 872px;
             top: 409px;
             background-image: url("assets/home/disk.png");
+            touch-action: none;
+            z-index: 50;
+        }
+
+        .disk.snapping {
+            transition: transform 0.4s ease;
+        }
+
+        .disk.behind-cd {
+            z-index: 4;
         }
 
         .settings {
@@ -354,6 +364,7 @@
             left: 0px;
             top: 673px;
             background-image: url("assets/home/cd_player.png");
+            cursor: pointer;
         }
 
         .bunny-cards,
@@ -680,9 +691,104 @@
             homePage.classList.toggle('menu-open');
         });
 
-        document.querySelector('.disk').addEventListener('click', () => {
+        const diskEl = document.querySelector('.disk');
+        const DISK_BASE = { left: 872, top: 409, width: 273, height: 240 };
+        const CD_BOUNDS = { left: 0, top: 673, width: 306, height: 305 };
+        const DISK_INSERT_TX =
+            (CD_BOUNDS.left + CD_BOUNDS.width / 2) - (DISK_BASE.left + DISK_BASE.width / 2);
+        const DISK_INSERT_TY =
+            (CD_BOUNDS.top + CD_BOUNDS.height / 2) - (DISK_BASE.top + DISK_BASE.height / 2);
+        let diskDragging = false;
+        let diskMoved = false;
+        let diskInserted = false;
+        let diskStartClientX = 0;
+        let diskStartClientY = 0;
+        let diskLastDx = 0;
+        let diskLastDy = 0;
+        const DRAG_THRESHOLD = 3;
+
+        function currentScale() {
+            return Math.min(window.innerWidth / 1440, window.innerHeight / 1024);
+        }
+
+        function diskOverlapsCD(tx, ty) {
+            const l = DISK_BASE.left + tx;
+            const t = DISK_BASE.top + ty;
+            const r = l + DISK_BASE.width;
+            const b = t + DISK_BASE.height;
+            return r > CD_BOUNDS.left
+                && l < CD_BOUNDS.left + CD_BOUNDS.width
+                && b > CD_BOUNDS.top
+                && t < CD_BOUNDS.top + CD_BOUNDS.height;
+        }
+
+        diskEl.addEventListener('pointerdown', (e) => {
+            diskDragging = true;
+            diskMoved = false;
+            diskStartClientX = e.clientX;
+            diskStartClientY = e.clientY;
+            if (diskInserted) {
+                diskStartClientX -= DISK_INSERT_TX * currentScale();
+                diskStartClientY -= DISK_INSERT_TY * currentScale();
+                diskLastDx = DISK_INSERT_TX;
+                diskLastDy = DISK_INSERT_TY;
+            } else {
+                diskLastDx = 0;
+                diskLastDy = 0;
+            }
+            diskEl.classList.remove('snapping');
+            diskEl.setPointerCapture(e.pointerId);
+        });
+
+        diskEl.addEventListener('pointermove', (e) => {
+            if (!diskDragging) return;
+            const scale = currentScale() || 1;
+            const dx = (e.clientX - diskStartClientX) / scale;
+            const dy = (e.clientY - diskStartClientY) / scale;
+            diskLastDx = dx;
+            diskLastDy = dy;
+            if (Math.hypot(dx, dy) > DRAG_THRESHOLD) diskMoved = true;
+            diskEl.style.transform = `translate(${dx}px, ${dy}px)`;
+            diskEl.classList.toggle('behind-cd', diskOverlapsCD(dx, dy));
+        });
+
+        function endDiskDrag(e) {
+            if (!diskDragging) return;
+            diskDragging = false;
+            const overlaps = diskOverlapsCD(diskLastDx, diskLastDy);
+            diskEl.classList.add('snapping');
+            if (overlaps) {
+                diskInserted = true;
+                diskEl.classList.add('behind-cd');
+                diskEl.style.transform = `translate(${DISK_INSERT_TX}px, ${DISK_INSERT_TY}px)`;
+            } else {
+                diskInserted = false;
+                diskEl.classList.remove('behind-cd');
+                diskEl.style.transform = 'translate(0, 0)';
+            }
+            if (e && diskEl.hasPointerCapture?.(e.pointerId)) {
+                diskEl.releasePointerCapture(e.pointerId);
+            }
+        }
+        diskEl.addEventListener('pointerup', endDiskDrag);
+        diskEl.addEventListener('pointercancel', endDiskDrag);
+
+        diskEl.addEventListener('click', (e) => {
+            if (diskMoved) {
+                e.stopImmediatePropagation();
+                e.preventDefault();
+                return;
+            }
             localStorage.setItem('kotoba-visited', '1');
             window.location.href = 'diskbox.html';
+        });
+
+        document.querySelector('.cd-player').addEventListener('click', () => {
+            if (!diskInserted) return;
+            diskInserted = false;
+            diskEl.classList.add('snapping');
+            diskEl.classList.remove('behind-cd');
+            diskEl.style.transform = 'translate(0, 0)';
         });
 
         if (window.location.search.includes('reset')) {
