@@ -301,7 +301,50 @@
             height: 97px;
             left: 0px;
             top: 45px;
-            background-image: url("assets/home/points.png");
+            background-image: url("assets/home/pointboard/points.png");
+        }
+
+        .points-digits {
+            position: absolute;
+            left: 85px;
+            top: 64px;
+            display: flex;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .points-digit {
+            width: 29px;
+            height: 59px;
+            background-repeat: no-repeat;
+            background-size: contain;
+            background-position: center;
+        }
+
+        .points-increment,
+        .points-reset {
+            position: absolute;
+            left: 0px;
+            width: 244px;
+            font-family: 'Forum', serif;
+            font-size: 24px;
+            line-height: 1;
+            text-align: center;
+            text-decoration: underline;
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            color: #000000;
+            z-index: 2;
+        }
+
+        .points-increment {
+            top: 150px;
+        }
+
+        .points-reset {
+            top: 184px;
         }
 
         .cd-player {
@@ -473,6 +516,14 @@
         <div class="disk"></div>
         <div class="cd-player"></div>
         <div class="points"></div>
+        <div class="points-digits">
+            <div class="points-digit"></div>
+            <div class="points-digit"></div>
+            <div class="points-digit"></div>
+            <div class="points-digit"></div>
+        </div>
+        <button class="points-increment" id="pointsIncrement">increment</button>
+        <button class="points-reset" id="pointsReset">reset</button>
         <div class="bunny-cards"></div>
         <div class="cds"></div>
         <div class="settings"></div>
@@ -641,6 +692,35 @@
         if (!localStorage.getItem('kotoba-visited')) {
             homePage.classList.add('first-visit');
         }
+
+        const POINTS_KEY = 'kotoba-points';
+        const pointsDigitEls = Array.from(document.querySelectorAll('.points-digit'));
+        const pointsMax = 10 ** pointsDigitEls.length;
+        let pointsValue = parseInt(localStorage.getItem(POINTS_KEY), 10);
+        if (!Number.isFinite(pointsValue) || pointsValue < 0) pointsValue = 0;
+
+        function renderPoints() {
+            const str = String(pointsValue).padStart(pointsDigitEls.length, '0').slice(-pointsDigitEls.length);
+            const firstNonZero = str.search(/[^0]/);
+            pointsDigitEls.forEach((el, i) => {
+                const show = firstNonZero === -1 ? i === pointsDigitEls.length - 1 : i >= firstNonZero;
+                el.style.backgroundImage = show ? `url("assets/home/pointboard/${str[i]}.png")` : 'none';
+            });
+        }
+
+        document.getElementById('pointsIncrement').addEventListener('click', () => {
+            pointsValue = (pointsValue + 1) % pointsMax;
+            localStorage.setItem(POINTS_KEY, String(pointsValue));
+            renderPoints();
+        });
+
+        document.getElementById('pointsReset').addEventListener('click', () => {
+            pointsValue = 0;
+            localStorage.setItem(POINTS_KEY, '0');
+            renderPoints();
+        });
+
+        renderPoints();
 
     </script>
 </body>
