@@ -13,12 +13,22 @@ import type {
   LineAnalysisResponse,
   StanzaAnalysisResponse,
   SongAnalysisResponse,
+  StanzaOverviewFromLinesResponse,
+  SongOverviewFromStanzasResponse,
 } from "./schemas";
-import { buildLinePrompt, buildStanzaPrompt, buildSongPrompt } from "./prompts";
+import {
+  buildLinePrompt,
+  buildStanzaPrompt,
+  buildSongPrompt,
+  buildStanzaOverviewFromLinesPrompt,
+  buildSongOverviewFromStanzasPrompt,
+} from "./prompts";
 import {
   LINE_ANALYSIS_CONTRACT,
   STANZA_ANALYSIS_CONTRACT,
   SONG_ANALYSIS_CONTRACT,
+  STANZA_OVERVIEW_FROM_LINES_CONTRACT,
+  SONG_OVERVIEW_FROM_STANZAS_CONTRACT,
 } from "./contracts";
 import { parseLine, parseStanza, parseSong } from "./parsers";
 import {
@@ -32,6 +42,9 @@ import {
   cacheSongStanzas,
 } from "./cache";
 import { callGeminiStructured } from "../../lib/gemini";
+import { mapWithConcurrency } from "../../lib/concurrency";
+import { splitPastedLyricsIntoStanzas } from "./lyricsSplit";
+import { AnalysisError } from "../../lib/errors";
 
 // ---------------------------------------------------------------------------
 // Options shared across all analysis calls
@@ -40,6 +53,11 @@ import { callGeminiStructured } from "../../lib/gemini";
 export interface AnalysisOptions {
   /** Skip cache and re-analyze. Default: false. */
   forceRefresh?: boolean;
+  /**
+   * Max parallel Gemini requests for bottom-up line batches.
+   * Lower this if you hit rate limits. Default: 4.
+   */
+  maxConcurrentGemini?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -148,10 +166,40 @@ export async function analyzeSong(
 // Bottom-up composition helpers
 // ---------------------------------------------------------------------------
 
+async function finalizeStanzaFromAnalyzedLines(
+  songTitle: string,
+  artistName: string,
+  stanzaNumber: number,
+  lines: string[],
+  lineResults: AnalysisLine[]
+): Promise<AnalysisStanza> {
+  const raw = await callGeminiStructured<StanzaOverviewFromLinesResponse>({
+    prompt: buildStanzaOverviewFromLinesPrompt({
+      songTitle,
+      artistName,
+      stanzaNumber,
+      stanzaJapanese: lines.join("\n"),
+      lines: lineResults,
+    }),
+    responseSchema: STANZA_OVERVIEW_FROM_LINES_CONTRACT as Record<
+      string,
+      unknown
+    >,
+  });
+
+  return {
+    japanese: lines.join("\n"),
+    stanzaNumber,
+    directTranslation: raw.directTranslation,
+    culturalTranslation: raw.culturalTranslation,
+    summary: raw.summary,
+    lines: lineResults,
+  };
+}
+
 /**
- * Analyze each line in a stanza individually, then compose into a stanza.
- * Useful when you want line-by-line progress feedback or already have
- * some lines cached.
+ * Analyze each line in a stanza individually (bounded parallelism), then
+ * one stanza-level Gemini pass for direct/cultural translation and summary.
  */
 export async function analyzeStanzaByLines(
   lines: string[],
@@ -161,8 +209,12 @@ export async function analyzeStanzaByLines(
   songId: string,
   options: AnalysisOptions = {}
 ): Promise<AnalysisStanza> {
-  const lineResults = await Promise.all(
-    lines.map((line, i) =>
+  const concurrency = options.maxConcurrentGemini ?? 4;
+
+  const lineResults = await mapWithConcurrency(
+    lines,
+    concurrency,
+    (line, i) =>
       analyzeLine(
         {
           line,
@@ -175,21 +227,117 @@ export async function analyzeStanzaByLines(
         songId,
         options
       )
-    )
   );
 
-  const composed: AnalysisStanza = {
-    japanese: lines.join("\n"),
+  const composed = await finalizeStanzaFromAnalyzedLines(
+    songTitle,
+    artistName,
     stanzaNumber,
-    directTranslation: lineResults
-      .map((l) => l.directTranslation)
-      .join("\n"),
-    culturalTranslation: lineResults
-      .map((l) => l.culturalTranslation)
-      .join("\n"),
-    lines: lineResults,
-  };
+    lines,
+    lineResults
+  );
 
   await cacheStanza(songId, composed);
   return composed;
+}
+
+export interface AnalyzeSongBottomUpParams {
+  songId: string;
+  songTitle: string;
+  artistName: string;
+  /** Raw pasted lyrics; blank lines separate stanzas, newlines separate lines. */
+  fullLyrics: string;
+}
+
+/**
+ * Bottom-up song analysis: lines (parallel Gemini) → stanza overview per stanza →
+ * song-level overview. Caches lines, stanzas, and the full song like {@link analyzeSong}.
+ */
+export async function analyzeSongBottomUp(
+  params: AnalyzeSongBottomUpParams,
+  options: AnalysisOptions = {}
+): Promise<SongAnalysis> {
+  const { songId, songTitle, artistName, fullLyrics } = params;
+  const concurrency = options.maxConcurrentGemini ?? 4;
+
+  if (!options.forceRefresh) {
+    const cached = await getCachedSong(songId);
+    if (cached) return cached;
+  }
+
+  const stanzaBlocks = splitPastedLyricsIntoStanzas(fullLyrics);
+  if (stanzaBlocks.length === 0) {
+    throw new AnalysisError(
+      "Lyrics are empty or could not be split into stanzas. Use blank lines between stanzas."
+    );
+  }
+
+  const stanzas: AnalysisStanza[] = [];
+
+  for (let s = 0; s < stanzaBlocks.length; s++) {
+    const lines = stanzaBlocks[s]!;
+    const stanzaNumber = s + 1;
+
+    const lineResults = await mapWithConcurrency(
+      lines,
+      concurrency,
+      (line, i) =>
+        analyzeLine(
+          {
+            line,
+            songTitle,
+            artistName,
+            stanzaNumber,
+            lineNumber: i + 1,
+            surroundingLines: lines,
+          },
+          songId,
+          options
+        )
+    );
+
+    const stanza = await finalizeStanzaFromAnalyzedLines(
+      songTitle,
+      artistName,
+      stanzaNumber,
+      lines,
+      lineResults
+    );
+
+    await Promise.all([
+      cacheStanza(songId, stanza),
+      cacheStanzaLines(songId, stanza),
+    ]);
+
+    stanzas.push(stanza);
+  }
+
+  const songRaw = await callGeminiStructured<SongOverviewFromStanzasResponse>({
+    prompt: buildSongOverviewFromStanzasPrompt({
+      songTitle,
+      artistName,
+      fullLyrics,
+      stanzas,
+    }),
+    responseSchema: SONG_OVERVIEW_FROM_STANZAS_CONTRACT as Record<
+      string,
+      unknown
+    >,
+  });
+
+  const song: SongAnalysis = {
+    songTitle,
+    artistName,
+    fullText: fullLyrics,
+    culturalTranslation: songRaw.culturalTranslation,
+    summary: songRaw.summary,
+    stanzas,
+  };
+
+  await Promise.all([
+    cacheSongAnalysis(songId, song),
+    cacheSongStanzas(songId, song),
+  ]);
+
+  return song;
 }

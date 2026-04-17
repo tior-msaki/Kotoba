@@ -42,8 +42,12 @@ import {
   analyzeStanza,
   analyzeSong,
   analyzeStanzaByLines,
+  analyzeSongBottomUp,
 } from "../domains/analysis/service";
-import type { AnalysisOptions } from "../domains/analysis/service";
+import type {
+  AnalysisOptions,
+  AnalyzeSongBottomUpParams,
+} from "../domains/analysis/service";
 
 import { exportLine, exportSong } from "../domains/dictionary/service";
 
@@ -55,6 +59,7 @@ export const cd = {
   analyzeStanza,
   analyzeSong,
   analyzeStanzaByLines,
+  analyzeSongBottomUp,
   saveLineToDictionary: exportLine,
   saveSongToDictionary: exportSong,
 } as const;
@@ -175,7 +180,7 @@ export const rewards = {
 // ---------------------------------------------------------------------------
 
 export type { FetchPlaylistOptions };
-export type { AnalysisOptions };
+export type { AnalysisOptions, AnalyzeSongBottomUpParams };
 export type { ExportContext, ExportResult } from "../domains/dictionary/export";
 export type { AnswerResult } from "../domains/rewards/quiz/service";
 export type { RewardsSummary } from "../domains/rewards/service";

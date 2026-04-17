@@ -200,6 +200,11 @@ export function parseStanza(
 ): AnalysisStanza {
   const stanzaNumber = requireNumber(raw.stanzaNumber, "stanza.stanzaNumber");
 
+  const summary =
+    typeof (raw as { summary?: unknown }).summary === "string"
+      ? (raw as { summary: string }).summary
+      : "";
+
   return {
     japanese: requireString(raw.japanese, "stanza.japanese"),
     stanzaNumber,
@@ -211,6 +216,7 @@ export function parseStanza(
       raw.culturalTranslation,
       "stanza.culturalTranslation"
     ),
+    summary,
     lines: requireArray<GeminiLineResponse>(raw.lines, "stanza.lines").map(
       (l) => parseLine(l, stanzaNumber)
     ),

@@ -123,3 +123,16 @@ export interface GeminiStanzaResponse {
   summary: string;
   lines: GeminiLineResponse[];
 }
+
+/** Stanza-level fields derived from already-analyzed lines (bottom-up). */
+export interface StanzaOverviewFromLinesResponse {
+  directTranslation: string;
+  culturalTranslation: string;
+  summary: string;
+}
+
+/** Song-level fields derived from already-analyzed stanzas (bottom-up). */
+export interface SongOverviewFromStanzasResponse {
+  culturalTranslation: string;
+  summary: string;
+}

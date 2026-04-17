@@ -214,3 +214,43 @@ export const SONG_ANALYSIS_CONTRACT = {
     "stanzas",
   ],
 } as const;
+
+/** Stanza-level overview when line analyses were produced separately (bottom-up). */
+export const STANZA_OVERVIEW_FROM_LINES_CONTRACT = {
+  type: "object",
+  properties: {
+    directTranslation: {
+      type: "string",
+      description:
+        "Literal English translation of the entire stanza (straight-to-the-point list style sentences allowed)",
+    },
+    culturalTranslation: {
+      type: "string",
+      description:
+        "Natural English for the whole stanza preserving Japanese cultural nuance",
+    },
+    summary: {
+      type: "string",
+      description: "1-2 sentence summary of what this stanza expresses",
+    },
+  },
+  required: ["directTranslation", "culturalTranslation", "summary"],
+} as const;
+
+/** Song-level overview when stanzas were built bottom-up from lines. */
+export const SONG_OVERVIEW_FROM_STANZAS_CONTRACT = {
+  type: "object",
+  properties: {
+    culturalTranslation: {
+      type: "string",
+      description:
+        "Natural English for the entire song preserving Japanese cultural nuance and poetic intent",
+    },
+    summary: {
+      type: "string",
+      description:
+        "2-4 sentence summary of themes, emotion, and cultural context of the whole song",
+    },
+  },
+  required: ["culturalTranslation", "summary"],
+} as const;

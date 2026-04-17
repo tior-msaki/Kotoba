@@ -79,6 +79,8 @@ export interface AnalysisStanza {
   stanzaNumber: number;
   directTranslation: string;
   culturalTranslation: string;
+  /** Short stanza-level summary (1–2 sentences). */
+  summary: string;
   lines: AnalysisLine[];
 }
 
