@@ -164,6 +164,10 @@
             z-index: 6;
         }
 
+        .home-page.disk-inserted .laptop {
+            cursor: pointer;
+        }
+
         .notes {
             position: absolute;
             width: 194px;
@@ -189,6 +193,7 @@
             left: 742px;
             top: 606px;
             background-image: url("assets/home/dictionary.png");
+            cursor: pointer;
         }
 
         .case {
@@ -378,6 +383,23 @@
             cursor: pointer;
         }
 
+        .cd-entered {
+            position: absolute;
+            width: 285px;
+            height: 100px;
+            left: 244px;
+            top: 309px;
+            background-image: url("assets/home/cd%20entered.png");
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+            z-index: 6;
+        }
+
+        .home-page.disk-inserted .cd-entered {
+            opacity: 1;
+        }
+
         .bunny-cards,
         .photocards {
             cursor: pointer;
@@ -525,8 +547,225 @@
             opacity: 0.35;
             pointer-events: none;
         }
+
+        .dictionary-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+
+        .dictionary-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .dictionary-overlay iframe {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: transparent;
+        }
+
+        .dictionary-close {
+            position: absolute;
+            top: 20px;
+            right: 24px;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #e8e0d0;
+            border: none;
+            color: #222;
+            font-family: Georgia, serif;
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+            box-shadow: 1px 2px 6px rgba(0, 0, 0, 0.4);
+            z-index: 2;
+        }
+
+        .dictionary-close:hover {
+            background: #d8cfc0;
+        }
+
+        .laptop-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+
+        .laptop-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .laptop-stage {
+            position: relative;
+            width: 1440px;
+            height: 1024px;
+            background: transparent;
+            transform-origin: center center;
+            flex-shrink: 0;
+        }
+
+        .laptop-stage > div {
+            background-repeat: no-repeat;
+            background-size: contain;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .music-popup-bg {
+            position: absolute;
+            width: 1375px;
+            height: 848px;
+            left: 37px;
+            top: 78px;
+            background-image: url("assets/laptop%20popup/music%20popup%20backgroudn.png");
+        }
+
+        .music-dim {
+            position: absolute;
+            width: 1375px;
+            height: 848px;
+            left: 37px;
+            top: 78px;
+            background: rgba(0, 0, 0, 0.25);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            pointer-events: none;
+        }
+
+        .laptop-stage.phase-burn .music-dim,
+        .laptop-stage.phase-eject .music-dim {
+            opacity: 1;
+        }
+
+        .burn-cd-popup {
+            position: absolute;
+            width: 803px;
+            height: 176px;
+            left: 358px;
+            top: 414px;
+            background-image: url("assets/laptop%20popup/burn%20CD%20popup.png");
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+
+        .laptop-stage.phase-burn .burn-cd-popup {
+            opacity: 1;
+        }
+
+        .url-input {
+            position: absolute;
+            width: 206px;
+            height: 45px;
+            left: 394px;
+            top: 514px;
+            font-family: 'Gamja Flower', cursive;
+            font-weight: 400;
+            font-size: 36px;
+            line-height: 45px;
+            color: #000000;
+            background: transparent;
+            border: none;
+            outline: none;
+            padding: 0;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+
+        .url-input::placeholder {
+            color: #000000;
+            opacity: 1;
+            font-family: 'Gamja Flower', cursive;
+            font-size: 36px;
+        }
+
+        .laptop-stage.phase-burn .url-input {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .error-msg {
+            position: absolute;
+            width: 566px;
+            height: 69px;
+            left: 573px;
+            top: 445px;
+            background-image: url("assets/laptop%20popup/error.png");
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        .laptop-stage.phase-burn.show-error .error-msg {
+            opacity: 1;
+        }
+
+        .eject-prompt {
+            position: absolute;
+            width: 442px;
+            height: 116px;
+            left: 331px;
+            top: 414px;
+            background-image: url("assets/laptop%20popup/eject%20cd.png");
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+
+        .yes-btn,
+        .no-btn {
+            position: absolute;
+            background: transparent no-repeat center/contain;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+
+        .yes-btn {
+            width: 74px;
+            height: 59px;
+            left: 609px;
+            top: 445px;
+            background-image: url("assets/laptop%20popup/yes.png");
+        }
+
+        .no-btn {
+            width: 61px;
+            height: 59px;
+            left: 688px;
+            top: 445px;
+            background-image: url("assets/laptop%20popup/no.png");
+        }
+
+        .laptop-stage.phase-eject .eject-prompt,
+        .laptop-stage.phase-eject .yes-btn,
+        .laptop-stage.phase-eject .no-btn {
+            opacity: 1;
+            pointer-events: auto;
+        }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Forum&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Forum&family=Gamja+Flower&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="viewport">
@@ -541,6 +780,7 @@
         <div class="case"></div>
         <div class="disk"></div>
         <div class="cd-player"></div>
+        <div class="cd-entered"></div>
         <div class="points"></div>
         <div class="points-digits">
             <div class="points-digit"></div>
@@ -587,12 +827,31 @@
             <button class="album-reset" id="albumReset">reset</button>
         </div>
     </div>
+
+    <div class="dictionary-overlay" id="dictionaryOverlay">
+        <button class="dictionary-close" id="dictionaryClose" aria-label="Close dictionary">×</button>
+        <iframe id="dictionaryFrame" title="Dictionary"></iframe>
+    </div>
+
+    <div class="laptop-overlay" id="laptopOverlay">
+        <div class="laptop-stage">
+            <div class="music-popup-bg"></div>
+            <div class="music-dim"></div>
+            <div class="burn-cd-popup"></div>
+            <input class="url-input" id="urlInput" type="text" placeholder="enter URL here" autocomplete="off" spellcheck="false" />
+            <div class="error-msg"></div>
+            <div class="eject-prompt"></div>
+            <button class="yes-btn" id="ejectYes" aria-label="Yes"></button>
+            <button class="no-btn" id="ejectNo" aria-label="No"></button>
+        </div>
+    </div>
     <script>
         function scaleContent() {
             const scale = Math.min(window.innerWidth / 1440, window.innerHeight / 1024);
             document.querySelector('.home-page').style.transform = `scale(${scale})`;
-            const stage = document.querySelector('.album-stage');
-            if (stage) stage.style.transform = `scale(${scale})`;
+            document.querySelectorAll('.album-stage, .laptop-stage').forEach(stage => {
+                stage.style.transform = `scale(${scale})`;
+            });
         }
         window.addEventListener('resize', scaleContent);
         scaleContent();
@@ -613,6 +872,19 @@
         document.querySelector('.photocards').addEventListener('click', openAlbum);
         document.getElementById('albumExit').addEventListener('click', () => {
             albumOverlay.classList.remove('open');
+        });
+
+        const dictionaryOverlay = document.getElementById('dictionaryOverlay');
+        const dictionaryFrame = document.getElementById('dictionaryFrame');
+        document.querySelector('.dictionary').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!dictionaryFrame.getAttribute('src')) {
+                dictionaryFrame.setAttribute('src', 'dictionary.html');
+            }
+            dictionaryOverlay.classList.add('open');
+        });
+        document.getElementById('dictionaryClose').addEventListener('click', () => {
+            dictionaryOverlay.classList.remove('open');
         });
 
         const ALBUM_STORAGE_KEY = 'kotoba-bunny-album';
@@ -784,10 +1056,12 @@
                 diskInserted = true;
                 diskEl.classList.add('behind-cd');
                 diskEl.style.transform = `translate(${DISK_INSERT_TX}px, ${DISK_INSERT_TY}px)`;
+                homePage.classList.add('disk-inserted');
             } else {
                 diskInserted = false;
                 diskEl.classList.remove('behind-cd');
                 diskEl.style.transform = 'translate(0, 0)';
+                homePage.classList.remove('disk-inserted');
             }
             if (e && diskEl.hasPointerCapture?.(e.pointerId)) {
                 diskEl.releasePointerCapture(e.pointerId);
@@ -810,12 +1084,76 @@
             navigateTo('disk-select.html');
         });
 
-        document.querySelector('.cd-player').addEventListener('click', () => {
+        function ejectDisk() {
             if (!diskInserted) return;
             diskInserted = false;
+            homePage.classList.remove('disk-inserted');
             diskEl.classList.add('snapping');
-            diskEl.classList.remove('behind-cd');
-            diskEl.style.transform = 'translate(0, 0)';
+            diskEl.style.transform = `translate(${DISK_INSERT_TX}px, 580px)`;
+            setTimeout(() => {
+                diskEl.classList.remove('behind-cd');
+                diskEl.style.transform = 'translate(0, 0)';
+            }, 400);
+        }
+        document.querySelector('.cd-player').addEventListener('click', ejectDisk);
+
+        const laptopOverlay = document.getElementById('laptopOverlay');
+        const laptopStage = laptopOverlay.querySelector('.laptop-stage');
+        const urlInput = document.getElementById('urlInput');
+        let musicPhaseTimer = null;
+
+        function openLaptopPopup() {
+            laptopStage.classList.remove('phase-burn', 'phase-eject', 'show-error');
+            laptopStage.classList.add('phase-music');
+            urlInput.value = '';
+            laptopOverlay.classList.add('open');
+            clearTimeout(musicPhaseTimer);
+            musicPhaseTimer = setTimeout(() => {
+                laptopStage.classList.remove('phase-music');
+                laptopStage.classList.add('phase-burn');
+                urlInput.focus();
+            }, 1000);
+        }
+
+        function closeLaptopPopup() {
+            clearTimeout(musicPhaseTimer);
+            laptopOverlay.classList.remove('open');
+            urlInput.blur();
+        }
+
+        document.querySelector('.laptop').addEventListener('click', () => {
+            if (!diskInserted) return;
+            openLaptopPopup();
+        });
+
+        laptopOverlay.addEventListener('click', (e) => {
+            if (e.target === laptopOverlay) closeLaptopPopup();
+        });
+
+        urlInput.addEventListener('input', () => {
+            laptopStage.classList.remove('show-error');
+        });
+
+        urlInput.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            const v = urlInput.value;
+            if (v === 'error') {
+                laptopStage.classList.add('show-error');
+            } else if (v === 'exit') {
+                laptopStage.classList.remove('phase-burn', 'show-error');
+                laptopStage.classList.add('phase-eject');
+                urlInput.blur();
+            }
+        });
+
+        document.getElementById('ejectYes').addEventListener('click', () => {
+            ejectDisk();
+            closeLaptopPopup();
+        });
+
+        document.getElementById('ejectNo').addEventListener('click', () => {
+            closeLaptopPopup();
         });
 
         if (window.location.search.includes('reset')) {

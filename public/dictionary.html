@@ -9,14 +9,14 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: #555;
+  background: transparent;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 24px 16px 32px;
-  gap: 20px;
+  padding: 16px 90px 20px;
+  gap: 12px;
   font-family: 'Linux Libertine', 'Times New Roman', serif;
 }
 
@@ -24,28 +24,37 @@ body {
 #nav {
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: center;
   user-select: none;
 }
 
 .nav-btn {
-  background: #e8e0d0;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 56px;
+  height: 56px;
+  background: transparent no-repeat center/contain;
   border: none;
-  border-radius: 4px;
-  padding: 7px 22px;
-  font-size: 13px;
-  font-family: Georgia, serif;
-  font-style: italic;
-  color: #222;
+  padding: 0;
   cursor: pointer;
-  box-shadow: 1px 2px 5px rgba(0,0,0,0.35);
-  transition: background 0.15s;
+  transition: opacity 0.15s;
+  z-index: 5;
 }
-.nav-btn:hover { background: #d8cfc0; }
-.nav-btn:disabled { opacity: 0.35; cursor: default; background: #e8e0d0; }
+.nav-btn:hover { opacity: 0.8; }
+.nav-btn:disabled { opacity: 0.35; cursor: default; }
+
+#btn-prev {
+  background-image: url("assets/disk%20select/left%20arrow.png");
+  left: -76px;
+}
+#btn-next {
+  background-image: url("assets/disk%20select/right%20arrow.png");
+  right: -76px;
+}
 
 #indicator {
-  color: #e8e0d0;
+  color: #000;
   font-size: 12px;
   font-style: italic;
   font-family: Georgia, serif;
@@ -60,7 +69,7 @@ body {
    Narrow: row layout, tabs on left or right side
 ══════════════════════════════════════════ */
 #book-wrap {
-  max-width: 700px;
+  max-width: min(880px, calc((100vh - 140px) * 6 / 5));
   width: 100%;
   display: flex;
   flex-direction: column;   /* tabs above book by default */
@@ -73,6 +82,7 @@ body {
   display: flex;
   flex-direction: row;
   align-items: flex-end;
+  justify-content: space-between;
   gap: 3px;
   padding: 0 2px 0 2px;
   user-select: none;
@@ -87,10 +97,7 @@ body {
   flex-direction: row;
   gap: 2px;
   align-items: flex-end;
-  /* Small gap between groups */
-  margin-right: 6px;
 }
-.tab-group:last-child { margin-right: 0; }
 
 /* ── SIDE TABS (narrow screens) ── */
 #tabs-side {
@@ -108,9 +115,9 @@ body {
 
 /* ── SHARED TAB BUTTON ── */
 .tab {
-  background: #b5a898;
-  color: #2a1f14;
-  border: 1px solid #8a7060;
+  background: #d0d0d0;
+  color: #000;
+  border: 1px solid #000;
   font-size: 13px;
   font-family: 'Noto Serif JP', 'Times New Roman', serif;
   font-weight: 700;
@@ -120,11 +127,11 @@ body {
   white-space: nowrap;
   user-select: none;
 }
-.tab:hover { background: #cfc0b0; color: #1a0f06; }
+.tab:hover { background: #e8e8e8; color: #000; }
 .tab.active {
-  background: #fdf8f2;
-  color: #1a0f06;
-  border-color: #8a7a68;
+  background: #ffffff;
+  color: #000;
+  border-color: #000;
   z-index: 4;
 }
 
@@ -138,7 +145,7 @@ body {
   bottom: -1px;
 }
 .tab-top.active {
-  border-bottom-color: #fdf8f2;
+  border-bottom-color: #ffffff;
   box-shadow: 0 -2px 6px rgba(0,0,0,0.15);
 }
 
@@ -152,7 +159,7 @@ body {
   right: -1px;
 }
 .tab-side-left.active {
-  border-right-color: #fdf8f2;
+  border-right-color: #ffffff;
   box-shadow: -2px 0 6px rgba(0,0,0,0.15);
 }
 .tab-side-right {
@@ -164,7 +171,7 @@ body {
   left: -1px;
 }
 .tab-side-right.active {
-  border-left-color: #fdf8f2;
+  border-left-color: #ffffff;
 }
 
 /* ── BOOK SPREAD ── */
@@ -180,7 +187,7 @@ body {
   gap: 0;
   box-shadow: 3px 5px 22px rgba(0,0,0,0.55);
   width: 100%;
-  border: 1px solid #8a7a68;
+  border: 1px solid #000;
   position: relative;
   z-index: 1;
   aspect-ratio: 6 / 5;
@@ -188,7 +195,7 @@ body {
 
 /* ── SINGLE PAGE ── */
 .page {
-  background: #fdf8f2;
+  background: #ffffff;
   color: #000;
   width: 50%;
   flex-shrink: 0;
@@ -198,7 +205,7 @@ body {
   border: none;
   overflow: hidden;
 }
-.page.left  { border-right: 1px solid #8a7a68; }
+.page.left  { border-right: 1px solid #000; }
 
 /* ── NARROW: side tabs ── */
 @media (max-width: 560px) {
@@ -218,7 +225,7 @@ body {
   border-bottom: 1.5px solid #000;
   padding: 3px 7px 2px 7px;
   flex-shrink: 0;
-  background: #fdf8f2;
+  background: #ffffff;
 }
 
 .hw-range {
@@ -305,12 +312,12 @@ rt {
 <body>
 
 <div id="nav">
-  <button class="nav-btn" id="btn-prev" onclick="turn(-1)">← Back</button>
   <span id="indicator"></span>
-  <button class="nav-btn" id="btn-next" onclick="turn(1)">Next →</button>
 </div>
 
 <div id="book-wrap">
+  <button class="nav-btn" id="btn-prev" onclick="turn(-1)" aria-label="Previous page"></button>
+  <button class="nav-btn" id="btn-next" onclick="turn(1)" aria-label="Next page"></button>
   <div id="tabs-top"></div>
   <div id="spread-wrap">
     <div id="tabs-side"></div>
