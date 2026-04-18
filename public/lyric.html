@@ -1086,10 +1086,125 @@ body.page-ready { opacity: 1; }
     translateAllBtn.hidden = !hasLyrics;
   }
 
+  // ─── Unified line-analysis chokepoint ───────────────────────────────
+  // Any caller that wants the analysis for a (si, li) goes through
+  // requestAnalyzeLine. It:
+  //   - returns instantly from state.analysisMap when present,
+  //   - joins an in-flight request (shared by select-line + prefetch +
+  //     translate-all) so the same line is never fetched twice, and
+  //   - guards against stale direction / stale-lyrics writes.
+  // Pure plumbing — the backend call, its shape, and caching below it
+  // are entirely unchanged.
+  var inFlightByKey = Object.create(null);
+  function requestAnalyzeLine(si, li) {
+    if (!state.lyrics || !state.lyrics.stanzas[si] ||
+        typeof state.lyrics.stanzas[si][li] !== 'string') {
+      return Promise.reject(new Error('line out of range'));
+    }
+    var key = lineKey(si, li);
+    if (state.analysisMap.has(key)) {
+      return Promise.resolve(state.analysisMap.get(key));
+    }
+    if (inFlightByKey[key]) {
+      return inFlightByKey[key];
+    }
+    if (typeof callbacks.analyzeLine !== 'function') {
+      return Promise.reject(new Error('Analysis backend not connected in this context.'));
+    }
+    var lineText = state.lyrics.stanzas[si][li];
+    var requestDirection = state.direction;
+    var requestLyrics = state.lyrics;
+    var promise;
+    try {
+      promise = Promise.resolve(
+        callbacks.analyzeLine(lineText, li + 1, si + 1, requestDirection)
+      );
+    } catch (err) {
+      return Promise.reject(err);
+    }
+    var wrapped = promise.then(function (result) {
+      delete inFlightByKey[key];
+      // Direction / lyrics changed while the request was in flight —
+      // drop stale result so the freshly-reset analysisMap stays clean.
+      if (state.direction !== requestDirection) return null;
+      if (state.lyrics !== requestLyrics) return null;
+      if (result && typeof result === 'object') {
+        state.analysisMap.set(key, result);
+        emitSessionChange('line-analyzed');
+      }
+      return result;
+    }, function (err) {
+      delete inFlightByKey[key];
+      throw err;
+    });
+    inFlightByKey[key] = wrapped;
+    return wrapped;
+  }
+
+  // DOM-surgical progress indicator — adds the .analyzed class to the
+  // specific line element without calling renderLyrics(). Avoids the
+  // scroll-reset / flicker that full re-renders would cause while the
+  // background prefetch is landing results.
+  function markLineAnalyzedInDom(si, li) {
+    if (!lyricsPane) return;
+    var sel = '.line[data-si="' + si + '"][data-li="' + li + '"]';
+    var nodes = lyricsPane.querySelectorAll(sel);
+    for (var i = 0; i < nodes.length; i++) nodes[i].classList.add('analyzed');
+  }
+
+  // Bumped on loadLyrics / open / direction-change to cancel any
+  // in-progress prefetch walk for the previous state.
+  var prefetchToken = 0;
+
+  /**
+   * Start background line-analysis preparation for the currently-loaded
+   * lyrics. Concurrency-bounded (2) so we don't flood the LLM proxy.
+   * Silent — no button change, no view jump, no loading state.
+   * Re-uses requestAnalyzeLine, so a user click mid-prefetch joins the
+   * same in-flight promise instead of firing a duplicate.
+   */
+  function prefetchLinesInBackground() {
+    if (!state.lyrics || !callbacks.analyzeLine) return;
+    if (state.isDemo) return; // demo lyrics are a local fallback, don't spend tokens on them
+    var myToken = ++prefetchToken;
+    var pending = [];
+    for (var si = 0; si < state.lyrics.stanzas.length; si++) {
+      for (var li = 0; li < state.lyrics.stanzas[si].length; li++) {
+        if (!state.analysisMap.has(lineKey(si, li))) {
+          pending.push({ si: si, li: li });
+        }
+      }
+    }
+    if (pending.length === 0) return;
+    var cursor = 0;
+    var CONCURRENCY = 2;
+    function worker() {
+      if (myToken !== prefetchToken) return;
+      if (cursor >= pending.length) return;
+      var item = pending[cursor++];
+      // A click (or translate-all) may have fulfilled or started this
+      // line since we queued it — requestAnalyzeLine handles both cases
+      // by returning the cache hit / joining the in-flight promise.
+      requestAnalyzeLine(item.si, item.li).then(function () {
+        if (myToken !== prefetchToken) return;
+        markLineAnalyzedInDom(item.si, item.li);
+        refreshSongStatus();
+        worker();
+      }, function () {
+        // Failures are isolated per line — a single bad line must not
+        // break the session. The line stays clickable and the user's
+        // real click will retry it.
+        if (myToken !== prefetchToken) return;
+        worker();
+      });
+    }
+    for (var n = 0; n < CONCURRENCY; n++) worker();
+  }
+
   /**
    * "Translate all" — iterates every line through the existing
-   * callbacks.analyzeLine pipeline in sequence (bounded to 1 at a time
-   * client-side so we don't fan out N simultaneous LLM calls).
+   * callbacks.analyzeLine pipeline (now via requestAnalyzeLine for
+   * dedup with the background prefetch / click paths).
    * Skips lines that are already analyzed. Progress is surfaced via
    * songStatusEl; the concatenated output shows up in the "all" view's
    * analysis pane (renderSongOverview already joins culturalTranslations).
@@ -1110,16 +1225,7 @@ body.page-ready { opacity: 1; }
         var key = lineKey(si, li);
         if (state.analysisMap.has(key)) { done++; continue; }
         try {
-          var result = await callbacks.analyzeLine(
-            stanzas[si][li],
-            li + 1,
-            si + 1,
-            state.direction
-          );
-          if (result && typeof result === 'object') {
-            state.analysisMap.set(key, result);
-            emitSessionChange('line-analyzed');
-          }
+          await requestAnalyzeLine(si, li);
         } catch (err) {
           failed++;
         }
@@ -1185,6 +1291,11 @@ body.page-ready { opacity: 1; }
     state.lyrics = splitLyrics(text);
     state.isDemo = !!isDemo;
     state.analysisMap = new Map();
+    // New lyrics → invalidate any in-flight requests from the previous
+    // lyrics set and cancel any prefetch walk. requestAnalyzeLine's
+    // stale-state guards handle late writes defensively too.
+    inFlightByKey = Object.create(null);
+    prefetchToken++;
     state.activeLineRef = null;
     state.activeStanzaIndex = 0;
     state.selectionAnalysis = null;
@@ -1194,6 +1305,10 @@ body.page-ready { opacity: 1; }
     renderLyrics();
     renderAnalysis();
     emitSessionChange('lyrics-loaded');
+    // Kick off background line-analysis prep — the user can keep
+    // clicking lines normally; prefetched hits just make those clicks
+    // faster. Runs on a microtask so this function returns promptly.
+    Promise.resolve().then(prefetchLinesInBackground);
   }
 
   function lineHtml(si, li, text, opts) {
@@ -1529,12 +1644,12 @@ body.page-ready { opacity: 1; }
     state.busy = true;
     renderAnalysisLoading('analyzing this line…');
     try {
-      var lineText = state.lyrics.stanzas[si][li];
-      var result = await callbacks.analyzeLine(lineText, li + 1, si + 1, state.direction);
-      if (result && typeof result === 'object') {
-        state.analysisMap.set(key, result);
-        emitSessionChange('line-analyzed');
-      }
+      // Route through the unified chokepoint. If the background prefetch
+      // (or a prior manual translate-all) is already working on this
+      // line, requestAnalyzeLine returns that in-flight promise and we
+      // never fire a duplicate LLM call. analysisMap is written inside
+      // requestAnalyzeLine on success — no double-write here.
+      await requestAnalyzeLine(si, li);
     } catch (err) {
       state.lastError = (err && err.message) ? err.message : String(err);
       state.busy = false;
@@ -2288,6 +2403,12 @@ body.page-ready { opacity: 1; }
   function onDirectionChange(newDir) {
     if (state.direction === newDir) return;
     state.analysisMap = new Map();
+    // Direction affects the model's output language, so any in-flight
+    // request queued under the old direction is now stale — cancel the
+    // prefetch walk and drop the dedup map. requestAnalyzeLine's
+    // direction-guard also discards in-flight writes after this.
+    inFlightByKey = Object.create(null);
+    prefetchToken++;
     state.selectionAnalysis = null;
     state.selectionAnswer = null;
     state.pendingQuestionText = null;
@@ -2298,6 +2419,9 @@ body.page-ready { opacity: 1; }
     renderLyrics();
     renderAnalysis();
     emitSessionChange('direction');
+    // Re-prime the cache for the new direction so the user's next line
+    // click is fast again.
+    Promise.resolve().then(prefetchLinesInBackground);
   }
   dirJaEnBtn.addEventListener('click', function () { onDirectionChange('ja-en'); });
   dirEnJaBtn.addEventListener('click', function () { onDirectionChange('en-ja'); });
@@ -2334,6 +2458,11 @@ body.page-ready { opacity: 1; }
         setTitle(state.context.songTitle, state.context.artistName);
         setDirection(ctx.direction || 'ja-en');
         state.analysisMap = new Map();
+        // Opening a new track: cancel any outstanding prefetch/dedup
+        // state from the previous track so late responses can't land
+        // on the new one. loadLyrics will bump these again if it runs.
+        inFlightByKey = Object.create(null);
+        prefetchToken++;
         state.activeLineRef = null;
         state.activeStanzaIndex = 0;
         state.selectionAnalysis = null;

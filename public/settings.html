@@ -198,7 +198,9 @@
         //     enumerate stores from the live DB rather than hard-coding the
         //     schema so future tables are also cleared.
         //   - localStorage keys owned by the legacy-HTML / React-bridge layer
-        //     (see src/frontend/LegacyDesignFrame.tsx).
+        //     (see src/frontend/LegacyDesignFrame.tsx), disk-select.html's
+        //     carousel selection, home.html's legacy inline notes store,
+        //     and every per-slot record written by slotMemory.ts (prefix).
         const LS_KEYS = [
             'kotoba-bunny-album',
             'kotoba-points',
@@ -206,7 +208,18 @@
             'kotoba-burned-playlist',
             'kotoba-spotify-bearer-token',
             'kotoba-visited',
+            // Last-committed carousel position (disk-select.html).
+            'kotoba-current-playlist-slot',
+            // Legacy inline notes store still written by home.html.
+            'kotoba-notes',
         ];
+
+        // Prefix of the per (playlistSlot, cdSlot) records written by
+        // src/domains/playlist/slotMemory.ts. Cleared via prefix scan
+        // below because the key set is variable — one per saved slot.
+        // Without this, burned CDs silently re-hydrate after a reload
+        // even though the user clicked "erase all data".
+        const SLOT_KEY_PREFIX = 'kotoba-slot-v1:';
 
         function clearDexieStores() {
             return new Promise((resolve, reject) => {
@@ -248,6 +261,25 @@
             LS_KEYS.forEach((k) => {
                 try { localStorage.removeItem(k); } catch (_) { /* noop */ }
             });
+            clearLocalStorageSlotMemory();
+        }
+
+        // Remove every per-slot record (kotoba-slot-v1:*). Two-pass so we
+        // don't mutate localStorage while iterating by index.
+        function clearLocalStorageSlotMemory() {
+            let toRemove;
+            try {
+                toRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (typeof k === 'string' && k.indexOf(SLOT_KEY_PREFIX) === 0) {
+                        toRemove.push(k);
+                    }
+                }
+            } catch (_) { return; }
+            for (let j = 0; j < toRemove.length; j++) {
+                try { localStorage.removeItem(toRemove[j]); } catch (_) { /* noop */ }
+            }
         }
 
         const eraseBtn = document.getElementById('eraseBtn');
