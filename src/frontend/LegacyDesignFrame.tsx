@@ -565,24 +565,6 @@ export function LegacyDesignFrame() {
         void burnFromPastedUrl(raw);
       };
 
-      // Explicit "burn" submit button — second path that never depends on
-      // the Enter key. Clicking it runs the same burnFromPastedUrl flow.
-      const burnSubmitBtn = doc.getElementById(
-        "burnSubmitBtn"
-      ) as HTMLElement | null;
-
-      const onBurnSubmitClick = (event: Event): void => {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        const raw = (urlInputEl?.value ?? "").trim();
-        if (raw.length === 0) {
-          showBurnError("Paste a playlist URL.");
-          try { urlInputEl?.focus(); } catch { /* ignore */ }
-          return;
-        }
-        void burnFromPastedUrl(raw);
-      };
-
       // Typing after an error should clear the red error sprite.
       const onUrlInputInput = (): void => clearBurnError();
 
@@ -1211,7 +1193,6 @@ export function LegacyDesignFrame() {
       // before home.html's legacy dev-string handler.
       urlInputEl?.addEventListener("keydown", onUrlInputKeydown, true);
       urlInputEl?.addEventListener("input", onUrlInputInput);
-      burnSubmitBtn?.addEventListener("click", onBurnSubmitClick);
       manualLyricsLink?.addEventListener("click", onManualLyricsClick);
       disk?.addEventListener("dragstart", onDragStart, true);
       disk?.addEventListener("dragend", onDragEnd, true);
@@ -1292,7 +1273,6 @@ export function LegacyDesignFrame() {
         searchOverlay?.removeEventListener("mousedown", onSearchOverlayMousedown);
         urlInputEl?.removeEventListener("keydown", onUrlInputKeydown, true);
         urlInputEl?.removeEventListener("input", onUrlInputInput);
-        burnSubmitBtn?.removeEventListener("click", onBurnSubmitClick);
         manualLyricsLink?.removeEventListener("click", onManualLyricsClick);
         if (burnPopupTimer !== undefined) clearTimeout(burnPopupTimer);
         disk?.removeEventListener("dragstart", onDragStart, true);

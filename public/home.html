@@ -236,6 +236,7 @@
             left: 1315px;
             top: 45px;
             background-image: url("assets/home/settings.png");
+            cursor: pointer;
         }
 
         .arrow {
@@ -799,34 +800,6 @@
             opacity: 1;
         }
 
-        /* Explicit "burn" submit button beside the URL input — gives the
-           user a visible click target in addition to pressing Enter.
-           Matches the Forum-font ghost buttons used elsewhere. */
-        .burn-submit-btn {
-            position: absolute;
-            left: 610px;
-            top: 514px;
-            width: 96px;
-            height: 45px;
-            font-family: 'Forum', serif;
-            font-size: 20px;
-            background: #ffffff;
-            border: 1px solid #000000;
-            color: #000000;
-            padding: 0;
-            cursor: pointer;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.35s ease, background 0.12s;
-            z-index: 3;
-        }
-        .laptop-stage.phase-burn .burn-submit-btn {
-            opacity: 1;
-            pointer-events: auto;
-        }
-        .burn-submit-btn:hover { background: #f2eadd; }
-        .burn-submit-btn:disabled { opacity: 0.55; cursor: wait; }
-
         /* "or paste lyrics manually" — secondary escape from the burn
            popup for users who don't have a provider URL. Uses the same
            Gamja Flower hint language the rest of the popup speaks in. */
@@ -986,7 +959,6 @@
             <div class="music-dim"></div>
             <div class="burn-cd-popup"></div>
             <input class="url-input" id="urlInput" type="text" placeholder="Spotify or YouTube URL" autocomplete="off" spellcheck="false" />
-            <button class="burn-submit-btn" id="burnSubmitBtn" type="button">burn</button>
             <button class="manual-lyrics-link" id="manualLyricsLink" type="button">or paste lyrics manually →</button>
             <div class="error-msg"></div>
             <div class="eject-prompt"></div>
@@ -1221,6 +1193,10 @@
 
         document.querySelector('.cds').addEventListener('click', () => {
             navigateTo('disk-select.html');
+        });
+
+        document.querySelector('.settings').addEventListener('click', () => {
+            navigateTo('settings.html');
         });
 
         function ejectDisk() {
