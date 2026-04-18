@@ -145,6 +145,30 @@
             opacity: 1;
         }
 
+        .laptop,
+        .notes,
+        .photocards,
+        .dictionary,
+        .disk,
+        .cd-player,
+        .bunny-cards,
+        .cds,
+        .settings {
+            transition: filter 0.2s ease;
+        }
+
+        .laptop:hover,
+        .notes:hover,
+        .photocards:hover,
+        .dictionary:hover,
+        .disk:hover,
+        .cd-player:hover,
+        .bunny-cards:hover,
+        .cds:hover,
+        .settings:hover {
+            filter: drop-shadow(4px 6px 6px rgba(0, 0, 0, 0.35));
+        }
+
         .desktop {
             position: absolute;
             width: 1440px;
@@ -175,6 +199,7 @@
             left: 702px;
             top: 438px;
             background-image: url("assets/home/notes.png");
+            cursor: pointer;
         }
 
         .photocards {
@@ -215,6 +240,12 @@
             touch-action: none;
             z-index: 50;
             cursor: grab;
+            opacity: 1 !important;
+            transition: filter 0.2s ease;
+        }
+
+        .disk.dragging {
+            filter: drop-shadow(4px 6px 6px rgba(0, 0, 0, 0.35));
         }
 
         .disk.dragging {
@@ -260,11 +291,11 @@
 
         .bunny-cards {
             position: absolute;
-            width: 147px;
-            height: 144px;
-            left: 1293px;
-            top: 45px;
-            background-image: url("assets/home/bunny cards.png");
+            width: 85px;
+            height: 129px;
+            left: 1325px;
+            top: 41px;
+            background-image: url("assets/home/pack%20icon.png");
         }
 
         .photocard-bubble {
@@ -348,11 +379,11 @@
             background-position: center;
         }
 
-        .points-increment {
+        .points-increment,
+        .points-reset {
             position: absolute;
             left: 0px;
             width: 244px;
-            top: 150px;
             font-family: 'Forum', serif;
             font-size: 24px;
             line-height: 1;
@@ -364,6 +395,14 @@
             cursor: pointer;
             color: #000000;
             z-index: 2;
+        }
+
+        .points-increment {
+            top: 150px;
+        }
+
+        .points-reset {
+            top: 184px;
         }
 
         .cd-player {
@@ -676,6 +715,170 @@
             background: #d8cfc0;
         }
 
+        .notes-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+        .notes-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .notes-window {
+            position: relative;
+            width: 900px;
+            height: 600px;
+            background: #fdf8ec;
+            border-radius: 14px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+            display: flex;
+            overflow: hidden;
+            font-family: Georgia, 'Forum', serif;
+            color: #2a2418;
+        }
+        .notes-close {
+            position: absolute;
+            top: 14px;
+            right: 16px;
+            width: 36px;
+            height: 35px;
+            background: url("assets/home/gacha/exit%20button.png") no-repeat center/contain;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            z-index: 5;
+            transition: transform 0.15s ease;
+        }
+        .notes-close:hover { transform: scale(1.08); }
+        .notes-sidebar {
+            width: 270px;
+            background: #f1e9d6;
+            border-right: 1px solid #d8cfb8;
+            display: flex;
+            flex-direction: column;
+        }
+        .notes-sidebar-header {
+            padding: 14px 14px 10px;
+            border-bottom: 1px solid #d8cfb8;
+        }
+        .notes-new-btn {
+            width: 100%;
+            padding: 8px 10px;
+            background: #e8e0d0;
+            border: 1px solid #c8bfa8;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 14px;
+            color: #2a2418;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .notes-new-btn:hover { background: #ddd2bc; }
+        .notes-list {
+            list-style: none;
+            margin: 0;
+            padding: 6px 0;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .notes-list li {
+            padding: 10px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid #e6dec8;
+        }
+        .notes-list li:hover { background: #ebe2cc; }
+        .notes-list li.active { background: #e0d4b6; }
+        .notes-list .note-title {
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .notes-list .note-meta {
+            display: flex;
+            gap: 8px;
+            font-size: 11px;
+            color: #6f6450;
+            margin-top: 3px;
+        }
+        .notes-list .note-meta .note-preview {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .notes-editor {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 16px 22px 22px;
+        }
+        .notes-editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-right: 44px;
+            min-height: 28px;
+            font-size: 12px;
+            color: #8a7e64;
+        }
+        .notes-delete-btn {
+            background: transparent;
+            border: none;
+            color: #a23030;
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .notes-delete-btn:hover { background: #f0d8d8; }
+        .note-title-input,
+        .note-subtitle-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            font-family: inherit;
+            color: #2a2418;
+            padding: 4px 0;
+        }
+        .note-title-input {
+            font-size: 22px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+        .note-subtitle-input {
+            font-size: 14px;
+            color: #6f6450;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #e6dec8;
+        }
+        .notes-content {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            resize: none;
+            font-family: inherit;
+            font-size: 15px;
+            line-height: 1.55;
+            color: #2a2418;
+            padding-top: 8px;
+        }
+        .notes-content:disabled,
+        .note-title-input:disabled,
+        .note-subtitle-input:disabled {
+            color: #a89c80;
+            cursor: not-allowed;
+        }
+
         .laptop-overlay {
             position: fixed;
             inset: 0;
@@ -876,6 +1079,157 @@
             opacity: 1;
             pointer-events: auto;
         }
+
+        .gacha-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+        .gacha-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .gacha-stage {
+            position: relative;
+            width: 1440px;
+            height: 1024px;
+            background: transparent;
+            transform-origin: center center;
+            flex-shrink: 0;
+        }
+        .gacha-stage > div {
+            background-repeat: no-repeat;
+            background-size: contain;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+        .gacha-points {
+            position: absolute;
+            width: 244px;
+            height: 97px;
+            left: 8px;
+            top: 21px;
+            background-image: url("assets/home/gacha/points.png");
+        }
+        .gacha-points-digits {
+            position: absolute;
+            left: 94px;
+            top: 40px;
+            display: flex;
+            pointer-events: none;
+        }
+        .gacha-digit {
+            width: 29px;
+            height: 59px;
+            background-repeat: no-repeat;
+            background-size: contain;
+            background-position: center;
+        }
+        .gacha-card-backing {
+            position: absolute;
+            width: 277px;
+            height: 412px;
+            left: 578px;
+            top: 317px;
+            background-image: url("assets/home/gacha/card%20backing.png");
+            z-index: 1;
+        }
+        .gacha-pack-body {
+            position: absolute;
+            width: 357px;
+            height: 569px;
+            left: 544px;
+            top: 260px;
+            background-image: url("assets/home/gacha/pack%20body.png");
+            z-index: 2;
+        }
+        .gacha-card-reveal {
+            position: absolute;
+            width: 277px;
+            height: 412px;
+            left: 578px;
+            top: 317px;
+            background-repeat: no-repeat;
+            background-size: contain;
+            background-position: center;
+            background-color: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            transform: translateY(-1100px);
+            pointer-events: none;
+            z-index: 3;
+        }
+        .gacha-pack-top {
+            position: absolute;
+            width: 369px;
+            height: 98px;
+            left: 532px;
+            top: 199px;
+            background-image: url("assets/home/gacha/pack%20top.png");
+            transform-origin: left center;
+            z-index: 4;
+        }
+        @keyframes gacha-rip-top {
+            0%   { transform: translate(0, 0) rotate(0); opacity: 1; }
+            60%  { transform: translate(-20px, -80px) rotate(-20deg); opacity: 1; }
+            100% { transform: translate(-40px, -260px) rotate(-40deg); opacity: 0; }
+        }
+        @keyframes gacha-backing-out {
+            0%   { transform: translateY(0); }
+            100% { transform: translateY(-1100px); }
+        }
+        @keyframes gacha-body-fade {
+            0%   { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        @keyframes gacha-card-in {
+            0%   { transform: translateY(-1100px); }
+            100% { transform: translateY(0); }
+        }
+        .gacha-stage.revealed .gacha-pack-top {
+            animation: gacha-rip-top 0.55s ease-in forwards;
+        }
+        .gacha-stage.revealed .gacha-card-backing {
+            animation: gacha-backing-out 0.55s ease-in 0.25s forwards;
+        }
+        .gacha-stage.revealed .gacha-pack-body {
+            animation: gacha-body-fade 0.4s ease 0.85s forwards;
+        }
+        .gacha-stage.revealed .gacha-card-reveal {
+            animation: gacha-card-in 0.55s ease-out 1.25s forwards;
+        }
+        .gacha-wish {
+            position: absolute;
+            width: 228px;
+            height: 103px;
+            left: 606px;
+            top: 840px;
+            background: url("assets/home/gacha/wish%20button.png") no-repeat center/contain;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            transition: transform 0.15s ease, opacity 0.2s ease;
+        }
+        .gacha-wish:hover { transform: scale(1.03); }
+        .gacha-wish:disabled { opacity: 0.35; cursor: default; transform: none; }
+        .gacha-exit {
+            position: absolute;
+            width: 61px;
+            height: 59px;
+            left: 1353px;
+            top: 48px;
+            background: url("assets/home/gacha/exit%20button.png") no-repeat center/contain;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Forum&family=Gamja+Flower&display=swap" rel="stylesheet">
 </head>
@@ -890,7 +1244,7 @@
         <div class="notes"></div>
         <div class="photocards"></div>
         <div class="case"></div>
-        <div class="disk"></div>
+        <div class="disk" draggable="false"></div>
         <div class="cd-player"></div>
         <div class="cd-entered"></div>
         <div class="points"></div>
@@ -901,6 +1255,7 @@
             <div class="points-digit"></div>
         </div>
         <button class="points-increment" id="pointsIncrement">increment</button>
+        <button class="points-reset" id="pointsReset">reset</button>
         <div class="bunny-cards"></div>
         <div class="cds"></div>
         <div class="settings"></div>
@@ -938,9 +1293,48 @@
         </div>
     </div>
 
+    <div class="gacha-overlay" id="gachaOverlay">
+        <div class="gacha-stage">
+            <div class="gacha-points"></div>
+            <div class="gacha-points-digits">
+                <div class="gacha-digit"></div>
+                <div class="gacha-digit"></div>
+                <div class="gacha-digit"></div>
+                <div class="gacha-digit"></div>
+            </div>
+            <div class="gacha-pack-body"></div>
+            <div class="gacha-card-backing"></div>
+            <div class="gacha-card-reveal"></div>
+            <div class="gacha-pack-top"></div>
+            <button class="gacha-wish" id="gachaWish" aria-label="Wish"></button>
+            <button class="gacha-exit" id="gachaExit" aria-label="Exit"></button>
+        </div>
+    </div>
+
     <div class="dictionary-overlay" id="dictionaryOverlay">
         <button class="dictionary-close" id="dictionaryClose" aria-label="Close dictionary">×</button>
         <iframe id="dictionaryFrame" title="Dictionary"></iframe>
+    </div>
+
+    <div class="notes-overlay" id="notesOverlay">
+        <div class="notes-window">
+            <button class="notes-close" id="notesClose" aria-label="Close notes"></button>
+            <aside class="notes-sidebar">
+                <div class="notes-sidebar-header">
+                    <button class="notes-new-btn" id="notesNew">+ New Note</button>
+                </div>
+                <ul class="notes-list" id="notesList"></ul>
+            </aside>
+            <main class="notes-editor">
+                <div class="notes-editor-header">
+                    <span id="notesDate"></span>
+                    <button class="notes-delete-btn" id="notesDelete">Delete</button>
+                </div>
+                <input class="note-title-input" id="notesTitle" placeholder="Title" spellcheck="false" />
+                <input class="note-subtitle-input" id="notesSubtitle" placeholder="Subtitle" spellcheck="false" />
+                <textarea class="notes-content" id="notesContent" placeholder="Start writing..." spellcheck="false"></textarea>
+            </main>
+        </div>
     </div>
 
     <div class="lyric-overlay" id="lyricOverlay">
@@ -970,7 +1364,7 @@
         function scaleContent() {
             const scale = Math.min(window.innerWidth / 1440, window.innerHeight / 1024);
             document.querySelector('.home-page').style.transform = `scale(${scale})`;
-            document.querySelectorAll('.album-stage, .laptop-stage').forEach(stage => {
+            document.querySelectorAll('.album-stage, .laptop-stage, .gacha-stage').forEach(stage => {
                 stage.style.transform = `scale(${scale})`;
             });
         }
@@ -989,7 +1383,6 @@
             albumOverlay.classList.add('open');
             renderAlbum();
         };
-        document.querySelector('.bunny-cards').addEventListener('click', openAlbum);
         document.querySelector('.photocards').addEventListener('click', openAlbum);
         document.getElementById('albumExit').addEventListener('click', () => {
             albumOverlay.classList.remove('open');
@@ -1011,6 +1404,18 @@
         const ALBUM_STORAGE_KEY = 'kotoba-bunny-album';
         const FRONT_CAPACITY = 5;
         const REGULAR_CAPACITY = 8;
+        const CARD_POOL = [
+            ...Array.from({ length: 23 }, (_, i) => `assets/bunny_photocards/bunny_${i + 1}.JPG`),
+            ...Array.from({ length: 3 }, (_, i) => `assets/special_pc/special_pc_${i + 1}.JPG`),
+        ];
+        const preloadedCards = new Map();
+        function preloadCard(path) {
+            if (preloadedCards.has(path)) return;
+            const img = new Image();
+            img.src = path;
+            preloadedCards.set(path, img);
+        }
+        CARD_POOL.forEach(preloadCard);
         // Photocard pulls are performed by the React bridge via the rewards
         // service (services/app.ts → rewards.gachaPull). The bridge writes
         // the pulled image path into ALBUM_STORAGE_KEY and reloads the
@@ -1126,6 +1531,8 @@
                 && t < CD_BOUNDS.top + CD_BOUNDS.height;
         }
 
+        diskEl.addEventListener('dragstart', (e) => e.preventDefault());
+
         diskEl.addEventListener('pointerdown', (e) => {
             diskDragging = true;
             diskMoved = false;
@@ -1188,7 +1595,7 @@
                 return;
             }
             localStorage.setItem('kotoba-visited', '1');
-            navigateTo('diskbox.html');
+            navigateTo('disk-select.html');
         });
 
         document.querySelector('.cds').addEventListener('click', () => {
@@ -1281,26 +1688,252 @@
 
         const POINTS_KEY = 'kotoba-points';
         const pointsDigitEls = Array.from(document.querySelectorAll('.points-digit'));
+        const gachaDigitEls = Array.from(document.querySelectorAll('.gacha-digit'));
         const pointsMax = 10 ** pointsDigitEls.length;
+        const WISH_COST = 100;
         let pointsValue = parseInt(localStorage.getItem(POINTS_KEY), 10);
         if (!Number.isFinite(pointsValue) || pointsValue < 0) pointsValue = 0;
 
-        function renderPoints() {
-            const str = String(pointsValue).padStart(pointsDigitEls.length, '0').slice(-pointsDigitEls.length);
+        function fillDigitGroup(els) {
+            const len = els.length;
+            if (!len) return;
+            const str = String(pointsValue).padStart(len, '0').slice(-len);
             const firstNonZero = str.search(/[^0]/);
-            pointsDigitEls.forEach((el, i) => {
-                const show = firstNonZero === -1 ? i === pointsDigitEls.length - 1 : i >= firstNonZero;
+            els.forEach((el, i) => {
+                const show = firstNonZero === -1 ? i === len - 1 : i >= firstNonZero;
                 el.style.backgroundImage = show ? `url("assets/home/pointboard/${str[i]}.png")` : 'none';
             });
         }
 
-        // #pointsIncrement click is intercepted by the React bridge in
-        // capture phase; the bridge calls rewards.earn() and syncs the
-        // local POINTS_KEY cache back from rewards.getBalance(), so we
-        // don't touch localStorage directly here anymore. An inline
-        // fallback would double-count.
+        function renderPoints() {
+            fillDigitGroup(pointsDigitEls);
+            fillDigitGroup(gachaDigitEls);
+            const wishBtn = document.getElementById('gachaWish');
+            if (wishBtn) wishBtn.disabled = pointsValue < WISH_COST;
+        }
+
+        document.getElementById('pointsIncrement').addEventListener('click', () => {
+            pointsValue = (pointsValue + 100) % pointsMax;
+            localStorage.setItem(POINTS_KEY, String(pointsValue));
+            renderPoints();
+        });
+
+        document.getElementById('pointsReset').addEventListener('click', () => {
+            pointsValue = 0;
+            localStorage.setItem(POINTS_KEY, '0');
+            renderPoints();
+        });
 
         renderPoints();
+
+        const gachaOverlay = document.getElementById('gachaOverlay');
+        const gachaStage = gachaOverlay.querySelector('.gacha-stage');
+        const gachaCardReveal = gachaOverlay.querySelector('.gacha-card-reveal');
+        const gachaWishBtn = document.getElementById('gachaWish');
+        const gachaExitBtn = document.getElementById('gachaExit');
+
+        function openGacha() {
+            gachaStage.classList.remove('revealed');
+            gachaCardReveal.style.backgroundImage = '';
+            renderPoints();
+            gachaOverlay.classList.add('open');
+        }
+        function closeGacha() {
+            gachaOverlay.classList.remove('open');
+        }
+        function pullGachaCard() {
+            if (pointsValue < WISH_COST) return;
+            pointsValue -= WISH_COST;
+            localStorage.setItem(POINTS_KEY, String(pointsValue));
+            const card = CARD_POOL[Math.floor(Math.random() * CARD_POOL.length)];
+            addedCards.push(card);
+            saveAlbum();
+            gachaCardReveal.style.backgroundImage = `url("${card}")`;
+            gachaStage.classList.remove('revealed');
+            void gachaStage.offsetWidth;
+            gachaStage.classList.add('revealed');
+            renderPoints();
+        }
+
+        document.querySelector('.bunny-cards').addEventListener('click', openGacha);
+        gachaWishBtn.addEventListener('click', pullGachaCard);
+        gachaExitBtn.addEventListener('click', closeGacha);
+        gachaOverlay.addEventListener('click', (e) => {
+            if (e.target === gachaOverlay) closeGacha();
+        });
+
+        const NOTES_STORAGE_KEY = 'kotoba-notes';
+        const notesOverlay = document.getElementById('notesOverlay');
+        const notesListEl = document.getElementById('notesList');
+        const notesTitleEl = document.getElementById('notesTitle');
+        const notesSubtitleEl = document.getElementById('notesSubtitle');
+        const notesContentEl = document.getElementById('notesContent');
+        const notesDateEl = document.getElementById('notesDate');
+        const notesDeleteBtn = document.getElementById('notesDelete');
+        const notesNewBtn = document.getElementById('notesNew');
+        const notesCloseBtn = document.getElementById('notesClose');
+
+        let notes = [];
+        let activeNoteId = null;
+        let notesSaveTimer = null;
+
+        try {
+            notes = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY)) || [];
+        } catch (_) { notes = []; }
+
+        function isEmptyNote(n) {
+            return !(n.title || '').trim()
+                && !(n.subtitle || '').trim()
+                && !(n.content || '').trim();
+        }
+        function pruneEmptyNotes(exceptId) {
+            notes = notes.filter(n => !isEmptyNote(n) || n.id === exceptId);
+        }
+        function saveNotes() {
+            const toSave = notes.filter(n => !isEmptyNote(n));
+            localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(toSave));
+        }
+        function formatNoteDate(ts) {
+            const d = new Date(ts);
+            const now = new Date();
+            const sameDay = d.toDateString() === now.toDateString();
+            if (sameDay) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            return d.toLocaleDateString();
+        }
+        function noteTitleText(n) {
+            const t = (n.title || '').trim();
+            if (t) return t;
+            const firstLine = (n.content || '').split('\n')[0].trim();
+            return firstLine || 'New Note';
+        }
+        function notePreviewText(n) {
+            const s = (n.subtitle || '').trim();
+            if (s) return s;
+            const titleSet = !!(n.title || '').trim();
+            const lines = (n.content || '').split('\n');
+            const startIdx = titleSet ? 0 : 1;
+            for (let i = startIdx; i < lines.length; i++) {
+                const t = lines[i].trim();
+                if (t) return t;
+            }
+            return 'No additional text';
+        }
+        function renderNotesList() {
+            notesListEl.innerHTML = '';
+            notes.forEach(n => {
+                const li = document.createElement('li');
+                if (n.id === activeNoteId) li.classList.add('active');
+                const title = document.createElement('div');
+                title.className = 'note-title';
+                title.textContent = noteTitleText(n);
+                const meta = document.createElement('div');
+                meta.className = 'note-meta';
+                const date = document.createElement('span');
+                date.textContent = formatNoteDate(n.updated);
+                const preview = document.createElement('span');
+                preview.className = 'note-preview';
+                preview.textContent = notePreviewText(n);
+                meta.appendChild(date);
+                meta.appendChild(preview);
+                li.appendChild(title);
+                li.appendChild(meta);
+                li.addEventListener('click', () => selectNote(n.id));
+                notesListEl.appendChild(li);
+            });
+        }
+        function renderNotesEditor() {
+            const n = notes.find(x => x.id === activeNoteId);
+            const disabled = !n;
+            [notesTitleEl, notesSubtitleEl, notesContentEl].forEach(el => el.disabled = disabled);
+            if (!n) {
+                notesTitleEl.value = '';
+                notesSubtitleEl.value = '';
+                notesContentEl.value = '';
+                notesDateEl.textContent = '';
+                notesDeleteBtn.style.visibility = 'hidden';
+                return;
+            }
+            if (notesTitleEl.value !== (n.title || '')) notesTitleEl.value = n.title || '';
+            if (notesSubtitleEl.value !== (n.subtitle || '')) notesSubtitleEl.value = n.subtitle || '';
+            if (notesContentEl.value !== (n.content || '')) notesContentEl.value = n.content || '';
+            notesDateEl.textContent = formatNoteDate(n.updated);
+            notesDeleteBtn.style.visibility = 'visible';
+        }
+        function selectNote(id) {
+            pruneEmptyNotes(id);
+            activeNoteId = id;
+            saveNotes();
+            renderNotesList();
+            renderNotesEditor();
+        }
+        function createNote() {
+            pruneEmptyNotes();
+            const n = {
+                id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+                title: '',
+                subtitle: '',
+                content: '',
+                updated: Date.now()
+            };
+            notes.unshift(n);
+            activeNoteId = n.id;
+            renderNotesList();
+            renderNotesEditor();
+            notesTitleEl.focus();
+        }
+        function deleteActiveNote() {
+            const idx = notes.findIndex(x => x.id === activeNoteId);
+            if (idx < 0) return;
+            notes.splice(idx, 1);
+            activeNoteId = notes[0] ? notes[0].id : null;
+            saveNotes();
+            renderNotesList();
+            renderNotesEditor();
+        }
+        function handleNoteInput() {
+            const n = notes.find(x => x.id === activeNoteId);
+            if (!n) return;
+            n.title = notesTitleEl.value;
+            n.subtitle = notesSubtitleEl.value;
+            n.content = notesContentEl.value;
+            n.updated = Date.now();
+            const idx = notes.indexOf(n);
+            if (idx > 0) { notes.splice(idx, 1); notes.unshift(n); }
+            clearTimeout(notesSaveTimer);
+            notesSaveTimer = setTimeout(() => {
+                saveNotes();
+                renderNotesList();
+            }, 300);
+        }
+        [notesTitleEl, notesSubtitleEl, notesContentEl].forEach(el => {
+            el.addEventListener('input', handleNoteInput);
+        });
+        function closeNotesOverlay() {
+            clearTimeout(notesSaveTimer);
+            pruneEmptyNotes();
+            if (!notes.find(x => x.id === activeNoteId)) {
+                activeNoteId = notes[0] ? notes[0].id : null;
+            }
+            saveNotes();
+            renderNotesList();
+            notesOverlay.classList.remove('open');
+        }
+        notesNewBtn.addEventListener('click', createNote);
+        notesDeleteBtn.addEventListener('click', deleteActiveNote);
+        notesCloseBtn.addEventListener('click', closeNotesOverlay);
+        notesOverlay.addEventListener('click', (e) => {
+            if (e.target === notesOverlay) closeNotesOverlay();
+        });
+        document.querySelector('.notes').addEventListener('click', () => {
+            if (activeNoteId && !notes.find(x => x.id === activeNoteId)) activeNoteId = null;
+            if (!activeNoteId && notes.length > 0) activeNoteId = notes[0].id;
+            renderNotesList();
+            renderNotesEditor();
+            notesOverlay.classList.add('open');
+            if (activeNoteId) {
+                setTimeout(() => notesTitleEl.focus(), 50);
+            }
+        });
 
     </script>
 </body>
