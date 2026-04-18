@@ -199,6 +199,7 @@
             left: 702px;
             top: 438px;
             background-image: url("assets/home/notes.png");
+            cursor: pointer;
         }
 
         .photocards {
@@ -713,6 +714,170 @@
             background: #d8cfc0;
         }
 
+        .notes-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+        .notes-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .notes-window {
+            position: relative;
+            width: 900px;
+            height: 600px;
+            background: #fdf8ec;
+            border-radius: 14px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+            display: flex;
+            overflow: hidden;
+            font-family: Georgia, 'Forum', serif;
+            color: #2a2418;
+        }
+        .notes-close {
+            position: absolute;
+            top: 14px;
+            right: 16px;
+            width: 36px;
+            height: 35px;
+            background: url("assets/home/gacha/exit%20button.png") no-repeat center/contain;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            z-index: 5;
+            transition: transform 0.15s ease;
+        }
+        .notes-close:hover { transform: scale(1.08); }
+        .notes-sidebar {
+            width: 270px;
+            background: #f1e9d6;
+            border-right: 1px solid #d8cfb8;
+            display: flex;
+            flex-direction: column;
+        }
+        .notes-sidebar-header {
+            padding: 14px 14px 10px;
+            border-bottom: 1px solid #d8cfb8;
+        }
+        .notes-new-btn {
+            width: 100%;
+            padding: 8px 10px;
+            background: #e8e0d0;
+            border: 1px solid #c8bfa8;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 14px;
+            color: #2a2418;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .notes-new-btn:hover { background: #ddd2bc; }
+        .notes-list {
+            list-style: none;
+            margin: 0;
+            padding: 6px 0;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .notes-list li {
+            padding: 10px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid #e6dec8;
+        }
+        .notes-list li:hover { background: #ebe2cc; }
+        .notes-list li.active { background: #e0d4b6; }
+        .notes-list .note-title {
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .notes-list .note-meta {
+            display: flex;
+            gap: 8px;
+            font-size: 11px;
+            color: #6f6450;
+            margin-top: 3px;
+        }
+        .notes-list .note-meta .note-preview {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .notes-editor {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 16px 22px 22px;
+        }
+        .notes-editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-right: 44px;
+            min-height: 28px;
+            font-size: 12px;
+            color: #8a7e64;
+        }
+        .notes-delete-btn {
+            background: transparent;
+            border: none;
+            color: #a23030;
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .notes-delete-btn:hover { background: #f0d8d8; }
+        .note-title-input,
+        .note-subtitle-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            font-family: inherit;
+            color: #2a2418;
+            padding: 4px 0;
+        }
+        .note-title-input {
+            font-size: 22px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+        .note-subtitle-input {
+            font-size: 14px;
+            color: #6f6450;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #e6dec8;
+        }
+        .notes-content {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            resize: none;
+            font-family: inherit;
+            font-size: 15px;
+            line-height: 1.55;
+            color: #2a2418;
+            padding-top: 8px;
+        }
+        .notes-content:disabled,
+        .note-title-input:disabled,
+        .note-subtitle-input:disabled {
+            color: #a89c80;
+            cursor: not-allowed;
+        }
+
         .laptop-overlay {
             position: fixed;
             inset: 0;
@@ -1106,7 +1271,7 @@
         <div class="notes"></div>
         <div class="photocards"></div>
         <div class="case"></div>
-        <div class="disk"></div>
+        <div class="disk" draggable="false"></div>
         <div class="cd-player"></div>
         <div class="cd-entered"></div>
         <div class="points"></div>
@@ -1176,6 +1341,27 @@
     <div class="dictionary-overlay" id="dictionaryOverlay">
         <button class="dictionary-close" id="dictionaryClose" aria-label="Close dictionary">×</button>
         <iframe id="dictionaryFrame" title="Dictionary"></iframe>
+    </div>
+
+    <div class="notes-overlay" id="notesOverlay">
+        <div class="notes-window">
+            <button class="notes-close" id="notesClose" aria-label="Close notes"></button>
+            <aside class="notes-sidebar">
+                <div class="notes-sidebar-header">
+                    <button class="notes-new-btn" id="notesNew">+ New Note</button>
+                </div>
+                <ul class="notes-list" id="notesList"></ul>
+            </aside>
+            <main class="notes-editor">
+                <div class="notes-editor-header">
+                    <span id="notesDate"></span>
+                    <button class="notes-delete-btn" id="notesDelete">Delete</button>
+                </div>
+                <input class="note-title-input" id="notesTitle" placeholder="Title" spellcheck="false" />
+                <input class="note-subtitle-input" id="notesSubtitle" placeholder="Subtitle" spellcheck="false" />
+                <textarea class="notes-content" id="notesContent" placeholder="Start writing..." spellcheck="false"></textarea>
+            </main>
+        </div>
     </div>
 
     <div class="lyric-overlay" id="lyricOverlay">
@@ -1372,6 +1558,8 @@
                 && b > CD_BOUNDS.top
                 && t < CD_BOUNDS.top + CD_BOUNDS.height;
         }
+
+        diskEl.addEventListener('dragstart', (e) => e.preventDefault());
 
         diskEl.addEventListener('pointerdown', (e) => {
             diskDragging = true;
@@ -1596,6 +1784,179 @@
         gachaExitBtn.addEventListener('click', closeGacha);
         gachaOverlay.addEventListener('click', (e) => {
             if (e.target === gachaOverlay) closeGacha();
+        });
+
+        const NOTES_STORAGE_KEY = 'kotoba-notes';
+        const notesOverlay = document.getElementById('notesOverlay');
+        const notesListEl = document.getElementById('notesList');
+        const notesTitleEl = document.getElementById('notesTitle');
+        const notesSubtitleEl = document.getElementById('notesSubtitle');
+        const notesContentEl = document.getElementById('notesContent');
+        const notesDateEl = document.getElementById('notesDate');
+        const notesDeleteBtn = document.getElementById('notesDelete');
+        const notesNewBtn = document.getElementById('notesNew');
+        const notesCloseBtn = document.getElementById('notesClose');
+
+        let notes = [];
+        let activeNoteId = null;
+        let notesSaveTimer = null;
+
+        try {
+            notes = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY)) || [];
+        } catch (_) { notes = []; }
+
+        function isEmptyNote(n) {
+            return !(n.title || '').trim()
+                && !(n.subtitle || '').trim()
+                && !(n.content || '').trim();
+        }
+        function pruneEmptyNotes(exceptId) {
+            notes = notes.filter(n => !isEmptyNote(n) || n.id === exceptId);
+        }
+        function saveNotes() {
+            const toSave = notes.filter(n => !isEmptyNote(n));
+            localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(toSave));
+        }
+        function formatNoteDate(ts) {
+            const d = new Date(ts);
+            const now = new Date();
+            const sameDay = d.toDateString() === now.toDateString();
+            if (sameDay) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            return d.toLocaleDateString();
+        }
+        function noteTitleText(n) {
+            const t = (n.title || '').trim();
+            if (t) return t;
+            const firstLine = (n.content || '').split('\n')[0].trim();
+            return firstLine || 'New Note';
+        }
+        function notePreviewText(n) {
+            const s = (n.subtitle || '').trim();
+            if (s) return s;
+            const titleSet = !!(n.title || '').trim();
+            const lines = (n.content || '').split('\n');
+            const startIdx = titleSet ? 0 : 1;
+            for (let i = startIdx; i < lines.length; i++) {
+                const t = lines[i].trim();
+                if (t) return t;
+            }
+            return 'No additional text';
+        }
+        function renderNotesList() {
+            notesListEl.innerHTML = '';
+            notes.forEach(n => {
+                const li = document.createElement('li');
+                if (n.id === activeNoteId) li.classList.add('active');
+                const title = document.createElement('div');
+                title.className = 'note-title';
+                title.textContent = noteTitleText(n);
+                const meta = document.createElement('div');
+                meta.className = 'note-meta';
+                const date = document.createElement('span');
+                date.textContent = formatNoteDate(n.updated);
+                const preview = document.createElement('span');
+                preview.className = 'note-preview';
+                preview.textContent = notePreviewText(n);
+                meta.appendChild(date);
+                meta.appendChild(preview);
+                li.appendChild(title);
+                li.appendChild(meta);
+                li.addEventListener('click', () => selectNote(n.id));
+                notesListEl.appendChild(li);
+            });
+        }
+        function renderNotesEditor() {
+            const n = notes.find(x => x.id === activeNoteId);
+            const disabled = !n;
+            [notesTitleEl, notesSubtitleEl, notesContentEl].forEach(el => el.disabled = disabled);
+            if (!n) {
+                notesTitleEl.value = '';
+                notesSubtitleEl.value = '';
+                notesContentEl.value = '';
+                notesDateEl.textContent = '';
+                notesDeleteBtn.style.visibility = 'hidden';
+                return;
+            }
+            if (notesTitleEl.value !== (n.title || '')) notesTitleEl.value = n.title || '';
+            if (notesSubtitleEl.value !== (n.subtitle || '')) notesSubtitleEl.value = n.subtitle || '';
+            if (notesContentEl.value !== (n.content || '')) notesContentEl.value = n.content || '';
+            notesDateEl.textContent = formatNoteDate(n.updated);
+            notesDeleteBtn.style.visibility = 'visible';
+        }
+        function selectNote(id) {
+            pruneEmptyNotes(id);
+            activeNoteId = id;
+            saveNotes();
+            renderNotesList();
+            renderNotesEditor();
+        }
+        function createNote() {
+            pruneEmptyNotes();
+            const n = {
+                id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+                title: '',
+                subtitle: '',
+                content: '',
+                updated: Date.now()
+            };
+            notes.unshift(n);
+            activeNoteId = n.id;
+            renderNotesList();
+            renderNotesEditor();
+            notesTitleEl.focus();
+        }
+        function deleteActiveNote() {
+            const idx = notes.findIndex(x => x.id === activeNoteId);
+            if (idx < 0) return;
+            notes.splice(idx, 1);
+            activeNoteId = notes[0] ? notes[0].id : null;
+            saveNotes();
+            renderNotesList();
+            renderNotesEditor();
+        }
+        function handleNoteInput() {
+            const n = notes.find(x => x.id === activeNoteId);
+            if (!n) return;
+            n.title = notesTitleEl.value;
+            n.subtitle = notesSubtitleEl.value;
+            n.content = notesContentEl.value;
+            n.updated = Date.now();
+            const idx = notes.indexOf(n);
+            if (idx > 0) { notes.splice(idx, 1); notes.unshift(n); }
+            clearTimeout(notesSaveTimer);
+            notesSaveTimer = setTimeout(() => {
+                saveNotes();
+                renderNotesList();
+            }, 300);
+        }
+        [notesTitleEl, notesSubtitleEl, notesContentEl].forEach(el => {
+            el.addEventListener('input', handleNoteInput);
+        });
+        function closeNotesOverlay() {
+            clearTimeout(notesSaveTimer);
+            pruneEmptyNotes();
+            if (!notes.find(x => x.id === activeNoteId)) {
+                activeNoteId = notes[0] ? notes[0].id : null;
+            }
+            saveNotes();
+            renderNotesList();
+            notesOverlay.classList.remove('open');
+        }
+        notesNewBtn.addEventListener('click', createNote);
+        notesDeleteBtn.addEventListener('click', deleteActiveNote);
+        notesCloseBtn.addEventListener('click', closeNotesOverlay);
+        notesOverlay.addEventListener('click', (e) => {
+            if (e.target === notesOverlay) closeNotesOverlay();
+        });
+        document.querySelector('.notes').addEventListener('click', () => {
+            if (activeNoteId && !notes.find(x => x.id === activeNoteId)) activeNoteId = null;
+            if (!activeNoteId && notes.length > 0) activeNoteId = notes[0].id;
+            renderNotesList();
+            renderNotesEditor();
+            notesOverlay.classList.add('open');
+            if (activeNoteId) {
+                setTimeout(() => notesTitleEl.focus(), 50);
+            }
         });
 
     </script>
