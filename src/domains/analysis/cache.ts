@@ -65,6 +65,26 @@ export async function cacheLine(
   await db.lineAnalysesCache.put(record);
 }
 
+/** Fetch every cached line for a song, in stanza/line order. Used by
+ *  the lyric-overlay rehydration path so a returning user sees all of
+ *  their prior per-line analyses without re-hitting the model. */
+export async function getCachedLinesForSong(
+  songId: string
+): Promise<AnalysisLine[]> {
+  const rows = await db.lineAnalysesCache
+    .where("songId")
+    .equals(songId)
+    .toArray();
+  return rows
+    .map((r) => r.analysis)
+    .sort((a, b) => {
+      if (a.stanzaNumber !== b.stanzaNumber) {
+        return a.stanzaNumber - b.stanzaNumber;
+      }
+      return a.lineNumber - b.lineNumber;
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Stanza cache
 // ---------------------------------------------------------------------------

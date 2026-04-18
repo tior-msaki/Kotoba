@@ -334,6 +334,249 @@ rt {
   #spread { max-width: 340px; }
   #spread .page.hidden-narrow { display: none; }
 }
+
+/* ── Entry is clickable — reveals the detail overlay ── */
+.e { cursor: pointer; }
+.e:hover { background: #f4f1ea; }
+
+/* ══════════════════════════════════════════
+   ENTRY DETAIL OVERLAY
+   Uses the same typography/border/shadow language as the book itself,
+   placed on a scrim. Not a new visual system — just the book's own
+   page at a larger scale so multi-meanings are readable.
+══════════════════════════════════════════ */
+#entry-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+#entry-detail-overlay.open { display: flex; }
+
+.ed-panel {
+  width: min(640px, 100%);
+  max-height: min(720px, 92vh);
+  background: #ffffff;
+  color: #000;
+  border: 1px solid #000;
+  box-shadow: 3px 5px 22px rgba(0, 0, 0, 0.55);
+  font-family: 'Noto Serif JP', 'Linux Libertine', 'Times New Roman', serif;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ed-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px 8px;
+  border-bottom: 1.5px solid #000;
+  flex-shrink: 0;
+}
+.ed-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.ed-surface {
+  font-size: 20pt;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.ed-surface ruby rt {
+  font-size: 9pt;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.ed-rom {
+  font-size: 10pt;
+  font-style: italic;
+  opacity: 0.8;
+}
+.ed-pos {
+  font-size: 9pt;
+  font-style: italic;
+  opacity: 0.8;
+}
+.ed-close {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 11pt;
+  text-decoration: underline;
+  cursor: pointer;
+  color: #000;
+  flex-shrink: 0;
+}
+
+.ed-body {
+  padding: 10px 16px 16px;
+  overflow-y: auto;
+  line-height: 1.45;
+  font-size: 10pt;
+}
+
+.ed-section {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 0.75px dashed #000;
+}
+.ed-section:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.ed-section-lbl {
+  font-size: 7.5pt;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  opacity: 0.75;
+}
+.ed-meaning-primary {
+  font-size: 11pt;
+}
+.ed-ctx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ed-ctx-item {
+  border-left: 2px solid #000;
+  padding: 2px 0 2px 8px;
+}
+.ed-ctx-meaning {
+  font-size: 10pt;
+}
+.ed-ctx-source {
+  font-size: 8pt;
+  font-style: italic;
+  opacity: 0.75;
+  margin-top: 1px;
+}
+.ed-ctx-line {
+  font-size: 8.5pt;
+  opacity: 0.85;
+  margin-top: 1px;
+}
+.ed-kanji {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ed-kanji-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 0.5px solid #000;
+  padding: 4px 6px;
+}
+.ed-kanji-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.ed-k-char {
+  font-size: 16pt;
+  font-weight: 700;
+}
+.ed-k-meaning {
+  font-size: 9.5pt;
+}
+.ed-k-sub {
+  font-size: 8pt;
+  opacity: 0.8;
+}
+.ed-example-src {
+  font-size: 9.5pt;
+}
+.ed-example-trans {
+  font-size: 9pt;
+  font-style: italic;
+  opacity: 0.85;
+  margin-top: 1px;
+}
+.ed-meta {
+  font-size: 8pt;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+.ed-empty {
+  font-size: 9pt;
+  font-style: italic;
+  opacity: 0.7;
+  padding: 6px 0;
+}
+
+/* ── Conjugations section (fetched on demand) ── */
+.ed-conj-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ed-conj-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 9.5pt;
+  line-height: 1.4;
+}
+.ed-conj-form {
+  font-weight: 700;
+  font-size: 9pt;
+}
+.ed-conj-surface {
+  font-family: 'Noto Serif JP', 'Times New Roman', serif;
+}
+.ed-conj-reading,
+.ed-conj-romaji {
+  font-size: 8.5pt;
+  opacity: 0.8;
+  font-style: italic;
+}
+.ed-conj-desc {
+  font-size: 8.5pt;
+  opacity: 0.85;
+}
+.ed-fetch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ed-fetch-btn {
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
+  padding: 3px 9px;
+  font: inherit;
+  font-size: 9pt;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.ed-fetch-btn:hover { background: #f4f1ea; }
+.ed-fetch-btn:disabled { opacity: 0.5; cursor: default; }
+.ed-fetch-status {
+  font-size: 8.5pt;
+  font-style: italic;
+  opacity: 0.75;
+}
+.ed-fetch-error {
+  font-size: 8.5pt;
+  font-style: italic;
+  color: #8a2020;
+}
 </style>
 </head>
 <body>
@@ -349,6 +592,20 @@ rt {
   <div id="spread-wrap">
     <div id="tabs-side"></div>
     <div id="spread"></div>
+  </div>
+</div>
+
+<!-- Word-detail overlay. Shows the saved DictionaryEntry's primary meaning,
+     accrued per-song context meanings, kanji breakdown, and example line —
+     the same data already passed through __kotobaDictionary.renderEntries.
+     No backend call, no new API surface. -->
+<div id="entry-detail-overlay" role="dialog" aria-modal="true" aria-labelledby="entry-detail-surface">
+  <div class="ed-panel" id="entry-detail-panel">
+    <div class="ed-header">
+      <div class="ed-title" id="entry-detail-title"></div>
+      <button type="button" class="ed-close" id="entry-detail-close" aria-label="Close">close</button>
+    </div>
+    <div class="ed-body" id="entry-detail-body"></div>
   </div>
 </div>
 
@@ -396,6 +653,25 @@ rt {
   /** One section == one book spread. */
   var sections = [];
   var currentIndex = 0;
+  /** Lookup for click → detail rendering. Rebuilt on every renderEntries. */
+  var entriesById = Object.create(null);
+  /** Callbacks supplied by the React bridge. Mirrors lyric.html's pattern. */
+  var callbacks = {
+    analyzeWordDetail: null
+  };
+  /**
+   * Per-entry-id conjugation fetch cache. Values:
+   *   { loading: true }          — in flight
+   *   { error: string }          — last attempt failed
+   *   { conjugations: array }    — fetched; render directly
+   * Keeps repeated opens idempotent and lets us re-render on state change
+   * without re-hitting the backend.
+   */
+  var conjFetchByEntryId = Object.create(null);
+  /** The entry currently open in the detail overlay. Used by the fetch
+   *  handler to re-render the overlay after async state changes without
+   *  re-binding button handlers or regrabbing the entry. */
+  var activeDetailEntry = null;
 
   function escapeHtml(s) {
     return String(s == null ? '' : s)
@@ -405,21 +681,34 @@ rt {
       .replace(/"/g, '&quot;');
   }
 
+  /** Build the headword markup with optional ruby over reading. Shared
+   *  between the book list (entryHtml) and the detail overlay header so
+   *  the two stay visually consistent. */
+  function headwordHtml(surface, reading) {
+    var esc = escapeHtml(surface);
+    var r = (reading || '').trim();
+    if (r.length === 0 || r === surface) return esc;
+    return '<ruby>' + esc + '<rt>' + escapeHtml(r) + '</rt></ruby>';
+  }
+
+  function posLabelFor(type) {
+    if (!type) return '';
+    return POS_LABEL[type] || type;
+  }
+
   /** Render one `.e` dictionary entry, preserving ruby/rt when reading is present. */
   function entryHtml(e) {
-    var surface = escapeHtml(e.surface);
-    var reading = (e.reading || '').trim();
-    var useRuby = reading.length > 0 && reading !== e.surface;
-    var hw = useRuby
-      ? '<ruby>' + surface + '<rt>' + escapeHtml(reading) + '</rt></ruby>'
-      : surface;
+    var hw = headwordHtml(e.surface, e.reading);
     var romaji = (e.romaji || '').trim();
     var rom = romaji ? ' <span class="rom">(' + escapeHtml(romaji) + ')</span>' : '';
-    var posLabel = e.type ? (POS_LABEL[e.type] || e.type) : '';
+    var posLabel = posLabelFor(e.type);
     var pos = posLabel ? ' <span class="pos">' + escapeHtml(posLabel) + '</span>' : '';
     var meaning = escapeHtml(e.meaning || '');
     var df = meaning ? ' <span class="df">' + meaning + '</span>' : '';
-    return '<div class="e"><span class="hw">' + hw + '</span>' + rom + pos + df + '</div>';
+    // `data-entry-id` is read by the click handler to pull the full
+    // DictionaryEntry out of entriesById and render the detail overlay.
+    var id = escapeHtml(e.id || '');
+    return '<div class="e" data-entry-id="' + id + '"><span class="hw">' + hw + '</span>' + rom + pos + df + '</div>';
   }
 
   function renderPage(label, pageNum, items, sideClass) {
@@ -558,20 +847,375 @@ rt {
    */
   window.__kotobaDictionary = {
     renderEntries: function (entries) {
-      sections = Array.isArray(entries) && entries.length > 0
-        ? groupBySection(entries)
-        : [];
+      var list = Array.isArray(entries) ? entries : [];
+      // Refresh the lookup every call — the bridge pushes the full list
+      // each time the overlay opens, so stale ids can't accumulate.
+      entriesById = Object.create(null);
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        if (e && typeof e.id === 'string') entriesById[e.id] = e;
+      }
+      sections = list.length > 0 ? groupBySection(list) : [];
       currentIndex = 0;
+      closeEntryDetail();
       refreshView();
     },
     showEmpty: function (message) {
       sections = [];
+      entriesById = Object.create(null);
       currentIndex = 0;
+      closeEntryDetail();
       renderEmpty(typeof message === 'string' && message.length > 0
         ? message
         : 'Save a word from a song to start your dictionary.');
-    }
+    },
+    /**
+     * Wire the word-detail fetcher. The bridge passes a function that
+     * takes a WordDetailRequest ({surface, romaji, type, direction,
+     * songTitle?, artistName?}) and returns a Promise<WordDetail>.
+     * Mirrors the lyric iframe's setAnalyzeWordDetail contract so both
+     * iframes call the same backend path.
+     */
+    setAnalyzeWordDetail: function (fn) { callbacks.analyzeWordDetail = fn; }
   };
+
+  // ─────────────────────────────────────────────────────────────────
+  // Entry detail overlay
+  // ─────────────────────────────────────────────────────────────────
+  var overlayEl = document.getElementById('entry-detail-overlay');
+  var overlayTitleEl = document.getElementById('entry-detail-title');
+  var overlayBodyEl = document.getElementById('entry-detail-body');
+  var overlayCloseBtn = document.getElementById('entry-detail-close');
+
+  function closeEntryDetail() {
+    if (!overlayEl) return;
+    overlayEl.classList.remove('open');
+    if (overlayTitleEl) overlayTitleEl.innerHTML = '';
+    if (overlayBodyEl) overlayBodyEl.innerHTML = '';
+    activeDetailEntry = null;
+    // Preserve conjFetchByEntryId across opens so re-opening the same
+    // word re-uses the fetched data instead of re-firing the request.
+  }
+
+  function renderPrimaryMeaning(entry) {
+    var meaning = (entry.meaning || '').trim();
+    if (meaning.length === 0) return '';
+    return '<div class="ed-section">'
+      + '<div class="ed-section-lbl">meaning</div>'
+      + '<div class="ed-meaning-primary">' + escapeHtml(meaning) + '</div>'
+      + '</div>';
+  }
+
+  function renderContextMeanings(entry) {
+    var ctx = Array.isArray(entry.contextMeanings) ? entry.contextMeanings : [];
+    if (ctx.length === 0) return '';
+    // Collapse exact-duplicate meaning strings while keeping the first
+    // song/line attribution — dedup in the storage layer is keyed by
+    // (songTitle, line), so the same meaning under two different lines
+    // legitimately appears twice and we want to show both.
+    var items = [];
+    for (var i = 0; i < ctx.length; i++) {
+      var c = ctx[i] || {};
+      var m = (c.meaning || '').trim();
+      if (m.length === 0) continue;
+      var source = '';
+      var songTitle = (c.songTitle || '').trim();
+      var artistName = (c.artistName || '').trim();
+      if (songTitle.length > 0 || artistName.length > 0) {
+        source = songTitle + (artistName.length > 0 ? ' — ' + artistName : '');
+      }
+      var line = (c.line || '').trim();
+      items.push(
+        '<div class="ed-ctx-item">'
+        + '<div class="ed-ctx-meaning">' + escapeHtml(m) + '</div>'
+        + (source ? '<div class="ed-ctx-source">' + escapeHtml(source) + '</div>' : '')
+        + (line ? '<div class="ed-ctx-line">“' + escapeHtml(line) + '”</div>' : '')
+        + '</div>'
+      );
+    }
+    if (items.length === 0) return '';
+    var lbl = items.length === 1 ? 'context meaning' : 'context meanings (' + items.length + ')';
+    return '<div class="ed-section">'
+      + '<div class="ed-section-lbl">' + lbl + '</div>'
+      + '<div class="ed-ctx-list">' + items.join('') + '</div>'
+      + '</div>';
+  }
+
+  function renderKanjiList(entry) {
+    var list = Array.isArray(entry.kanjiList) ? entry.kanjiList : [];
+    if (list.length === 0) return '';
+    var items = [];
+    for (var i = 0; i < list.length; i++) {
+      var k = list[i] || {};
+      var char = (k.character || '').trim();
+      if (char.length === 0) continue;
+      var sub = '';
+      if (Array.isArray(k.kunYomi) && k.kunYomi.length > 0) {
+        sub += '<div class="ed-k-sub"><em>kun:</em> ' + escapeHtml(k.kunYomi.join(', ')) + '</div>';
+      }
+      if (Array.isArray(k.onYomi) && k.onYomi.length > 0) {
+        sub += '<div class="ed-k-sub"><em>on:</em> ' + escapeHtml(k.onYomi.join(', ')) + '</div>';
+      }
+      if (Array.isArray(k.nanori) && k.nanori.length > 0) {
+        sub += '<div class="ed-k-sub"><em>nanori:</em> ' + escapeHtml(k.nanori.join(', ')) + '</div>';
+      }
+      items.push(
+        '<div class="ed-kanji-entry">'
+        + '<div class="ed-kanji-top">'
+        +   '<span class="ed-k-char">' + escapeHtml(char) + '</span>'
+        +   '<span class="ed-k-meaning">' + escapeHtml(k.meaning || '') + '</span>'
+        + '</div>'
+        + sub
+        + '</div>'
+      );
+    }
+    if (items.length === 0) return '';
+    return '<div class="ed-section">'
+      + '<div class="ed-section-lbl">kanji</div>'
+      + '<div class="ed-kanji">' + items.join('') + '</div>'
+      + '</div>';
+  }
+
+  function renderExample(entry) {
+    var src = (entry.exampleSentence || '').trim();
+    var trans = (entry.exampleTranslation || '').trim();
+    if (src.length === 0 && trans.length === 0) return '';
+    return '<div class="ed-section">'
+      + '<div class="ed-section-lbl">example</div>'
+      + (src ? '<div class="ed-example-src">' + escapeHtml(src) + '</div>' : '')
+      + (trans ? '<div class="ed-example-trans">' + escapeHtml(trans) + '</div>' : '')
+      + '</div>';
+  }
+
+  /**
+   * Render the conjugations section. Three states:
+   *   - fetched  → list of conjugations (or a "no conjugations" note)
+   *   - loading  → status line
+   *   - error    → status + retry button
+   *   - idle     → fetch button (unless the backend isn't wired, in which
+   *                case we show a safe fallback note instead of a dead button)
+   */
+  function renderConjugations(entry) {
+    if (!entry || typeof entry.id !== 'string') return '';
+    var state = conjFetchByEntryId[entry.id];
+
+    var inner;
+    if (state && state.conjugations) {
+      if (state.conjugations.length === 0) {
+        inner = '<div class="ed-fetch-status">No conjugations returned for this word.</div>';
+      } else {
+        var items = [];
+        for (var i = 0; i < state.conjugations.length; i++) {
+          var c = state.conjugations[i] || {};
+          var form = escapeHtml(c.form || '');
+          var surface = escapeHtml(c.surface || '');
+          var reading = (c.reading && c.reading !== c.surface)
+            ? '<span class="ed-conj-reading">[' + escapeHtml(c.reading) + ']</span>'
+            : '';
+          var romaji = c.romaji
+            ? '<span class="ed-conj-romaji">(' + escapeHtml(c.romaji) + ')</span>'
+            : '';
+          var desc = c.description
+            ? '<span class="ed-conj-desc">— ' + escapeHtml(c.description) + '</span>'
+            : '';
+          items.push(
+            '<div class="ed-conj-item">'
+            + '<span class="ed-conj-form">' + form + ':</span>'
+            + '<span class="ed-conj-surface">' + surface + '</span>'
+            + reading + romaji + desc
+            + '</div>'
+          );
+        }
+        inner = '<div class="ed-conj-list">' + items.join('') + '</div>';
+      }
+    } else if (state && state.loading) {
+      inner = '<div class="ed-fetch-row">'
+        + '<span class="ed-fetch-status">fetching conjugations…</span>'
+        + '</div>';
+    } else if (state && state.error) {
+      inner = '<div class="ed-fetch-row">'
+        + '<span class="ed-fetch-error">fetch failed: ' + escapeHtml(state.error) + '</span>'
+        + '<button type="button" class="ed-fetch-btn" data-ed-fetch-conj="1">retry</button>'
+        + '</div>';
+    } else if (typeof callbacks.analyzeWordDetail !== 'function') {
+      // Bridge not wired (e.g. standalone /dictionary.html visit). Don't
+      // show a button the user can't use; keep the section quiet.
+      return '';
+    } else {
+      inner = '<div class="ed-fetch-row">'
+        + '<button type="button" class="ed-fetch-btn" data-ed-fetch-conj="1">fetch conjugations ↓</button>'
+        + '</div>';
+    }
+
+    return '<div class="ed-section">'
+      + '<div class="ed-section-lbl">conjugations</div>'
+      + inner
+      + '</div>';
+  }
+
+  function renderMeta(entry) {
+    var bits = [];
+    if (typeof entry.encounterCount === 'number' && entry.encounterCount > 0) {
+      bits.push('encountered ' + entry.encounterCount + (entry.encounterCount === 1 ? ' time' : ' times'));
+    }
+    var firstTrack = (entry.sourceTrackName || '').trim();
+    var firstArtist = (entry.artistName || '').trim();
+    if (firstTrack.length > 0) {
+      bits.push('first seen in ' + firstTrack + (firstArtist ? ' — ' + firstArtist : ''));
+    }
+    if (bits.length === 0) return '';
+    return '<div class="ed-meta">' + escapeHtml(bits.join(' · ')) + '</div>';
+  }
+
+  function openEntryDetail(entry) {
+    if (!overlayEl || !overlayTitleEl || !overlayBodyEl) return;
+    if (!entry || typeof entry !== 'object') return;
+    activeDetailEntry = entry;
+    renderActiveDetail();
+    overlayEl.classList.add('open');
+  }
+
+  /** (Re-)paint the currently-open detail overlay from activeDetailEntry.
+   *  Separate from openEntryDetail so async state changes (conjugation
+   *  fetch state transitions) can re-render in place without toggling
+   *  the overlay visibility. */
+  function renderActiveDetail() {
+    var entry = activeDetailEntry;
+    if (!entry || !overlayEl || !overlayTitleEl || !overlayBodyEl) return;
+
+    // Header — same visual language as the list entry, just scaled up.
+    var titleBits = [];
+    titleBits.push('<span class="ed-surface" id="entry-detail-surface">'
+      + headwordHtml(entry.surface, entry.reading)
+      + '</span>');
+    var romaji = (entry.romaji || '').trim();
+    if (romaji.length > 0) {
+      titleBits.push('<span class="ed-rom">(' + escapeHtml(romaji) + ')</span>');
+    }
+    var pos = posLabelFor(entry.type);
+    if (pos.length > 0) {
+      titleBits.push('<span class="ed-pos">' + escapeHtml(pos) + '</span>');
+    }
+    overlayTitleEl.innerHTML = titleBits.join('');
+
+    // Body — render only sections that have data. If nothing at all
+    // survives, show a safe fallback rather than an empty panel.
+    var bodyHtml =
+      renderPrimaryMeaning(entry)
+      + renderContextMeanings(entry)
+      + renderConjugations(entry)
+      + renderKanjiList(entry)
+      + renderExample(entry)
+      + renderMeta(entry);
+    if (bodyHtml.length === 0) {
+      bodyHtml = '<div class="ed-empty">No additional details saved for this word yet.</div>';
+    }
+    overlayBodyEl.innerHTML = bodyHtml;
+  }
+
+  /**
+   * Request conjugations for the active detail entry. Uses the same
+   *  WordDetailRequest shape the lyric UI already sends, so the backend
+   *  path, prompt, and cache behavior are identical. Only the
+   *  `conjugations` field of the returned WordDetail is rendered here —
+   *  alternatives / examples are intentionally out of scope for this
+   *  feature.
+   */
+  function fetchConjugationsForActiveEntry() {
+    var entry = activeDetailEntry;
+    if (!entry || typeof entry.id !== 'string') return;
+    if (typeof callbacks.analyzeWordDetail !== 'function') {
+      conjFetchByEntryId[entry.id] = { error: 'conjugation backend not available' };
+      renderActiveDetail();
+      return;
+    }
+    // Don't refire if already loading or already fetched.
+    var current = conjFetchByEntryId[entry.id];
+    if (current && (current.loading || current.conjugations)) {
+      renderActiveDetail();
+      return;
+    }
+    conjFetchByEntryId[entry.id] = { loading: true };
+    renderActiveDetail();
+    var entryId = entry.id;
+    var req = {
+      surface: entry.surface || '',
+      romaji: entry.romaji || '',
+      type: entry.type || '',
+      direction: entry.direction || 'ja-en'
+    };
+    var p;
+    try {
+      p = callbacks.analyzeWordDetail(req);
+    } catch (err) {
+      var msg = (err && err.message) ? err.message : String(err);
+      conjFetchByEntryId[entryId] = { error: msg };
+      renderActiveDetail();
+      return;
+    }
+    Promise.resolve(p).then(function (detail) {
+      // Ignore late responses for entries the user has since navigated
+      // away from — don't clobber a newer fetch's state.
+      if (!conjFetchByEntryId[entryId] || !conjFetchByEntryId[entryId].loading) {
+        return;
+      }
+      var list = (detail && Array.isArray(detail.conjugations)) ? detail.conjugations : [];
+      conjFetchByEntryId[entryId] = { conjugations: list };
+      renderActiveDetail();
+    }, function (err) {
+      if (!conjFetchByEntryId[entryId] || !conjFetchByEntryId[entryId].loading) {
+        return;
+      }
+      var msg = (err && err.message) ? err.message : String(err);
+      conjFetchByEntryId[entryId] = { error: msg };
+      renderActiveDetail();
+    });
+  }
+
+  // Delegated click: the spread re-renders on every page/tab change, so
+  // per-element listeners would have to be rewired each time. Delegation
+  // keeps the wiring one-shot and immune to spread redraws.
+  document.addEventListener('click', function (event) {
+    var target = event.target;
+    if (!(target instanceof Element)) return;
+    var entryEl = target.closest ? target.closest('.e') : null;
+    if (!entryEl || !spreadEl.contains(entryEl)) return;
+    var id = entryEl.getAttribute('data-entry-id');
+    if (!id) return;
+    var entry = entriesById[id];
+    if (!entry) return;
+    openEntryDetail(entry);
+  });
+
+  if (overlayCloseBtn) overlayCloseBtn.addEventListener('click', closeEntryDetail);
+  if (overlayEl) {
+    overlayEl.addEventListener('mousedown', function (event) {
+      // Click on the scrim (not the panel itself) dismisses.
+      if (event.target === overlayEl) closeEntryDetail();
+    });
+    // Delegated click for the per-section fetch button. Rebuilt by
+    // renderActiveDetail every state change, so per-button listeners
+    // would have to be rewired each repaint — delegation avoids that.
+    overlayEl.addEventListener('click', function (event) {
+      var target = event.target;
+      if (!(target instanceof Element)) return;
+      var btn = target.closest ? target.closest('[data-ed-fetch-conj]') : null;
+      if (!btn) return;
+      event.preventDefault();
+      event.stopPropagation();
+      // Retry clears the stored error so fetch will re-fire.
+      if (activeDetailEntry && activeDetailEntry.id) {
+        var st = conjFetchByEntryId[activeDetailEntry.id];
+        if (st && st.error) delete conjFetchByEntryId[activeDetailEntry.id];
+      }
+      fetchConjugationsForActiveEntry();
+    });
+  }
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && overlayEl && overlayEl.classList.contains('open')) {
+      closeEntryDetail();
+    }
+  });
 
   // Initial paint: empty state so a standalone visit to /dictionary.html
   // (no React shell) still looks coherent. The bridge overwrites this.

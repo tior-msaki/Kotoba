@@ -157,6 +157,15 @@
         let currentIndex = 0;
         const prevOffsets = new Map();
 
+        // Slot memory handoff: the React bridge reads this key at save
+        // time to bind each slot record to the carousel position the user
+        // picked. No other side effects — purely additive.
+        const PLAYLIST_SLOT_KEY = 'kotoba-current-playlist-slot';
+        function markSlotSelected() {
+            try { localStorage.setItem(PLAYLIST_SLOT_KEY, String(currentIndex)); }
+            catch (e) { /* private mode / quota — autosave silently falls back to 'default' */ }
+        }
+
         const cdEls = playlists.map((pl, i) => {
             const el = document.createElement('div');
             el.className = 'cd';
@@ -164,6 +173,7 @@
             el.dataset.index = i;
             el.addEventListener('click', () => {
                 if (i === currentIndex) {
+                    markSlotSelected();
                     navigateTo('home.html');
                     return;
                 }
@@ -219,6 +229,7 @@
             if (e.key === 'ArrowRight') { next(); e.preventDefault(); }
             else if (e.key === 'ArrowLeft') { prev(); e.preventDefault(); }
             else if (e.key === 'Enter' || e.key === ' ') {
+                markSlotSelected();
                 window.location.href = 'home.html';
                 e.preventDefault();
             }

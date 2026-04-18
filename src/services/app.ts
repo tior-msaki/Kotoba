@@ -108,6 +108,7 @@ import {
   analyzeWordDetail,
   askAboutSelection,
 } from "../domains/analysis/service";
+import { getCachedLinesForSong } from "../domains/analysis/cache";
 import type {
   AnalysisOptions,
   AnalyzeSongBottomUpParams,
@@ -139,6 +140,7 @@ export const cd = {
   saveLineToDictionary: exportLine,
   saveSongToDictionary: exportSong,
   saveWordToDictionary: exportWord,
+  getCachedLines: getCachedLinesForSong,
 } as const;
 
 // ---------------------------------------------------------------------------

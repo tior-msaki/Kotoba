@@ -12,6 +12,14 @@ import type {
   WordDetail,
 } from "../services/app";
 import { parsePlaylistUrl } from "../domains/playlist/url";
+import {
+  findLatestSlotForPlaylist,
+  loadSlotMemory,
+  updateSlotMemory,
+  type SlotCdState,
+  type SlotLyricSession,
+  type SlotPlaylistSource,
+} from "../domains/playlist/slotMemory";
 
 const LYRIC_DEMO_HASH = "#lyric-demo";
 const SEARCH_DEMO_HASH = "#search";
@@ -22,6 +30,10 @@ const CD_STATE_KEY = "kotoba-cd-state";
 const BURNED_PLAYLIST_KEY = "kotoba-burned-playlist";
 const SPOTIFY_TOKEN_KEY = "kotoba-spotify-bearer-token";
 const VISITED_KEY = "kotoba-visited";
+// Written by disk-select.html's CD-click handler. Fallback "default" when
+// the user reached home.html without going through the picker (direct
+// link, first-time visit, or a browser that blocked the write).
+const CURRENT_PLAYLIST_SLOT_KEY = "kotoba-current-playlist-slot";
 
 type CdStatus = "none" | "ejected" | "inserted" | "burned";
 
@@ -119,6 +131,272 @@ function ensureInitializedUiState(): boolean {
   return changed;
 }
 
+// ---------------------------------------------------------------------------
+// Slot-memory autosave — writes per (playlistSlot, cdSlot) records to
+// localStorage via src/domains/playlist/slotMemory.ts. This block owns
+// every call site that decides "should the current slot be persisted
+// right now, and with what fields?" — no other file reaches into
+// slotMemory directly.
+//
+// Slot identity:
+//   playlistSlotId = carousel index persisted by disk-select.html (fallback
+//                    "default" — see CURRENT_PLAYLIST_SLOT_KEY above).
+//   cdSlotId       = "<provider>:<playlistId>" when a playlist is burned
+//                    onto the CD, else "manual:<stableSongId>" when the
+//                    user is in the paste-your-own-lyrics flow.
+//
+// Empty-state protection lives here too: we refuse to write source
+// records with no tracks, or lyric records with no songId — so stray
+// UI transitions can never land a placeholder slot over a real one.
+// ---------------------------------------------------------------------------
+
+function readCurrentPlaylistSlotId(): string {
+  try {
+    const raw = localStorage.getItem(CURRENT_PLAYLIST_SLOT_KEY);
+    if (typeof raw === "string" && raw.trim().length > 0) return raw.trim();
+  } catch {
+    // fall through to default
+  }
+  return "default";
+}
+
+function cdSlotIdFromBurned(burned: BurnedPlaylistState): string {
+  return `${burned.provider}:${burned.playlistId}`;
+}
+
+function cdSlotIdFromSongId(songId: string): string {
+  return `manual:${songId}`;
+}
+
+function autosaveSource(burned: BurnedPlaylistState): void {
+  if (!burned.tracks || burned.tracks.length === 0) return;
+  const source: SlotPlaylistSource = {
+    provider: burned.provider,
+    playlistId: burned.playlistId,
+    playlistName: burned.playlistName,
+    tracks: burned.tracks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      artist: t.artist,
+    })),
+  };
+  updateSlotMemory({
+    playlistSlotId: readCurrentPlaylistSlotId(),
+    cdSlotId: cdSlotIdFromBurned(burned),
+    source,
+  });
+}
+
+function autosaveBurnedCdState(
+  burned: BurnedPlaylistState,
+  cdState: CdState
+): void {
+  const block: SlotCdState = {
+    status: cdState.status,
+    lastUpdatedAt: cdState.lastUpdatedAt,
+  };
+  updateSlotMemory({
+    playlistSlotId: readCurrentPlaylistSlotId(),
+    cdSlotId: cdSlotIdFromBurned(burned),
+    cdState: block,
+  });
+}
+
+interface LyricSessionSnapshot {
+  reason: string;
+  songTitle: string;
+  artistName: string;
+  sourceTrackId?: string;
+  direction: "ja-en" | "en-ja";
+  lyricsText: string | null;
+  hasLyrics: boolean;
+  view: "all" | "stanza" | "line" | "word";
+  activeLineRef: { stanzaIndex: number; lineIndex: number } | null;
+  activeStanzaIndex: number | null;
+  isDemo: boolean;
+  analysisCount: number;
+}
+
+function autosaveLyricSession(
+  songId: string,
+  snapshot: LyricSessionSnapshot
+): void {
+  // Demo lyrics are an explicit fallback the user loads by hitting the
+  // "use demo" button — not real work. Persisting them would clobber a
+  // slot's real session on demo inspection, so skip them entirely.
+  if (snapshot.isDemo) return;
+  // Nothing of value yet: empty blank open. Don't save a placeholder.
+  if (!snapshot.hasLyrics && snapshot.analysisCount === 0) return;
+
+  const playlistSlotId = readCurrentPlaylistSlotId();
+  const burned = readBurnedPlaylistState();
+  const cdSlotId = burned
+    ? cdSlotIdFromBurned(burned)
+    : cdSlotIdFromSongId(songId);
+
+  const session: SlotLyricSession = {
+    songId,
+    sourceTrackId: snapshot.sourceTrackId,
+    songTitle: snapshot.songTitle,
+    artistName: snapshot.artistName,
+    direction: snapshot.direction,
+    lyrics: snapshot.lyricsText,
+    view: snapshot.view,
+    activeLineRef: snapshot.activeLineRef,
+    activeStanzaIndex: snapshot.activeStanzaIndex,
+    isDemo: false,
+    updatedAt: Date.now(),
+  };
+
+  updateSlotMemory({
+    playlistSlotId,
+    cdSlotId,
+    lyricSession: session,
+  });
+}
+
+/**
+ * Reconcile the global `kotoba-burned-playlist` / `kotoba-cd-state`
+ * scalars (which home.html's visuals read through the bridge) with
+ * whatever slot the user is now on. Runs once per home-bridge attach,
+ * BEFORE `applyCdStateToDesign`, so the desk paints in the restored
+ * state on first render — no flicker.
+ *
+ * Three outcomes:
+ *   1. This playlist slot has a saved record → restore its burned CD
+ *      + cd-state into the global scalars (overwriting any scalar that
+ *      was left behind from a different playlist slot).
+ *   2. No saved record for this playlist slot, but stale global
+ *      scalars exist → clear them, so the new carousel position shows
+ *      empty state instead of the previous slot's CD.
+ *   3. No saved record and no global scalars → no-op, leaving whatever
+ *      `ensureInitializedUiState` set up (a blank ejected disc).
+ *
+ * Never touches the per-slot records — hydration is read-only against
+ * slot memory, which protects every other saved slot from accidental
+ * overwrite during restore.
+ */
+function hydrateBurnedCdFromSlot(): void {
+  const playlistSlotId = readCurrentPlaylistSlotId();
+  // Pick the latest slot WITH A BURNED SOURCE. Without this filter, a
+  // manual-lyrics sub-slot saved on the same playlistSlotId later than
+  // the burned slot would be picked by max(savedAt); it has no source
+  // so we'd bail out, leaving the global scalars however the *previous*
+  // carousel position left them — which could be "cleared" if the user
+  // had just come from an unused slot. That manifests as the burned CD
+  // silently vanishing after touching manual mode + switching slots.
+  const slot = findLatestSlotForPlaylist(
+    playlistSlotId,
+    (s) =>
+      !!(
+        s.source &&
+        s.source.tracks &&
+        s.source.tracks.length > 0 &&
+        (s.source.provider === "spotify" || s.source.provider === "youtube") &&
+        s.source.playlistId &&
+        s.source.playlistName
+      )
+  );
+
+  if (slot && slot.source && slot.source.tracks && slot.source.tracks.length > 0) {
+    const source = slot.source;
+    // Type narrowing: slotMemory accepts "manual" as a provider but the
+    // burned-playlist scalar only holds real providers. The predicate
+    // above already rejected "manual", so this is a structural guard
+    // for the type system only.
+    if (source.provider !== "spotify" && source.provider !== "youtube") {
+      return;
+    }
+    if (!source.playlistId || !source.playlistName) return;
+    if (!source.tracks || source.tracks.length === 0) return;
+
+    const burned: BurnedPlaylistState = {
+      provider: source.provider,
+      playlistId: source.playlistId,
+      playlistName: source.playlistName,
+      tracks: source.tracks,
+    };
+    writeBurnedPlaylistState(burned);
+
+    const cdState: CdState = {
+      status: slot.cdState?.status ?? "burned",
+      lastUpdatedAt: slot.cdState?.lastUpdatedAt ?? Date.now(),
+      playlistId: source.playlistId,
+      playlistName: source.playlistName,
+    };
+    writeCdState(cdState);
+    return;
+  }
+
+  // No saved slot for this playlist position. If the global scalars
+  // still hold a CD from a different playlist, clear them so the user
+  // sees the empty state they expect for a fresh slot.
+  const existingBurned = readBurnedPlaylistState();
+  if (existingBurned) {
+    localStorage.removeItem(BURNED_PLAYLIST_KEY);
+  }
+  const existingCd = readCdState();
+  if (existingCd.status === "burned") {
+    writeCdState({ status: "ejected", lastUpdatedAt: Date.now() });
+  }
+}
+
+interface LyricHydrationPayload {
+  view: "all" | "stanza" | "line" | "word";
+  activeLineRef: { stanzaIndex: number; lineIndex: number } | null;
+  activeStanzaIndex: number | null;
+  analyses: AnalysisLine[];
+}
+
+/**
+ * Resolve lyric-overlay hydration for the currently active slot, if any.
+ * Returns null when:
+ *   - the slot has no saved lyric session, OR
+ *   - the saved session is for a different track than the one the user
+ *     just clicked (songId mismatch — don't leak stale state across
+ *     tracks).
+ *
+ * The cached line analyses come from Dexie (`lineAnalysesCache`) keyed
+ * by songId — the same rows the live analyze path already writes to.
+ */
+async function resolveLyricHydration(
+  ctx: { sourceTrackId?: string; songTitle: string; artistName: string },
+  songId: string
+): Promise<{
+  session: SlotLyricSession;
+  payload: LyricHydrationPayload;
+} | null> {
+  const playlistSlotId = readCurrentPlaylistSlotId();
+  const burned = readBurnedPlaylistState();
+  const cdSlotId = burned
+    ? cdSlotIdFromBurned(burned)
+    : cdSlotIdFromSongId(songId);
+
+  const slot = loadSlotMemory(playlistSlotId, cdSlotId);
+  if (!slot || !slot.lyricSession) return null;
+  if (slot.lyricSession.songId !== songId) return null;
+
+  let analyses: AnalysisLine[] = [];
+  try {
+    analyses = await cd.getCachedLines(songId);
+  } catch {
+    // Dexie can fail in Safari private mode; fall through with no
+    // analyses. The lyrics themselves still rehydrate — the user just
+    // re-clicks any line to re-analyze.
+    analyses = [];
+  }
+
+  return {
+    session: slot.lyricSession,
+    payload: {
+      view: slot.lyricSession.view,
+      activeLineRef: slot.lyricSession.activeLineRef,
+      activeStanzaIndex: slot.lyricSession.activeStanzaIndex,
+      analyses,
+    },
+  };
+}
+
 function imagePathFromPull(cardId: string, rarity: string): string {
   if (rarity === "legendary") {
     const n = Number(cardId.replace("ssr-", "")) || 1;
@@ -160,6 +438,12 @@ export function LegacyDesignFrame() {
 
     const attachHomeBridge = async (): Promise<(() => void) | void> => {
       await syncPointsFromBackend();
+
+      // Slot-memory hydration happens BEFORE DOM queries so that
+      // `applyCdStateToDesign` (called further down) paints the restored
+      // CD state on the very first render. No read of home.html's DOM
+      // depends on this — the method only touches localStorage scalars.
+      hydrateBurnedCdFromSlot();
 
       const frame = iframeRef.current;
       const doc = frame?.contentDocument;
@@ -353,12 +637,14 @@ export function LegacyDesignFrame() {
 
         closeBtn.onclick = () => overlay.remove();
         ejectBtn.onclick = () => {
-          writeCdState({
+          const ejected: CdState = {
             status: "ejected",
             lastUpdatedAt: Date.now(),
             playlistId: playlist.playlistId,
             playlistName: playlist.playlistName,
-          });
+          };
+          writeCdState(ejected);
+          autosaveBurnedCdState(playlist, ejected);
           overlay.remove();
           applyCdStateToDesign();
         };
@@ -459,12 +745,18 @@ export function LegacyDesignFrame() {
           tracks,
         };
         writeBurnedPlaylistState(burned);
-        writeCdState({
+        const burnedCd: CdState = {
           status: "burned",
           lastUpdatedAt: Date.now(),
           playlistId,
           playlistName,
-        });
+        };
+        writeCdState(burnedCd);
+        // Persist the new slot (playlistSlot x "<provider>:<playlistId>"):
+        // source + burned cdState land together so a return visit has
+        // everything needed to re-render this CD without refetching.
+        autosaveSource(burned);
+        autosaveBurnedCdState(burned, burnedCd);
         applyCdStateToDesign();
         closeBurnPopup();
       }
@@ -576,9 +868,24 @@ export function LegacyDesignFrame() {
       ) as HTMLElement | null;
 
       const openLyricManualMode = (): void => {
+        // Manual-mode sessions share the same default title/artist
+        // ("Your lyrics" / ""), so without a per-open identifier every
+        // manual paste would collide on `stableSongId` → Dexie would
+        // serve a *previous* manual session's cached line analyses for
+        // the *current* paste's line 1/stanza 1, regardless of which
+        // playlist slot the user is on. That's a cross-slot cache leak
+        // at the analysis layer, not the slot layer. A per-open token
+        // gives each manual session its own keyspace in Dexie and its
+        // own cdSlotId in slot memory. Trade-off: manual sessions
+        // don't survive a full refresh (the token regenerates); bound
+        // by product scope, refreshability isn't expected for the
+        // paste-your-own-lyrics flow.
+        const sessionToken =
+          Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
         openLyric({
           songTitle: "Your lyrics",
           artistName: "",
+          sourceTrackId: `manual:${sessionToken}`,
         });
       };
 
@@ -713,6 +1020,19 @@ export function LegacyDesignFrame() {
       type DictionaryBridgeApi = {
         renderEntries: (entries: unknown[]) => void;
         showEmpty: (message: string) => void;
+        // Word-detail fetcher used by the dictionary's per-entry
+        // conjugation section. Mirrors the lyric iframe's identical
+        // callback so both iframes hit the same cd.analyzeWordDetail
+        // path; the dictionary renders only `conjugations` out of the
+        // returned WordDetail, matching the scope of this fix.
+        setAnalyzeWordDetail?: (
+          fn: (req: {
+            surface: string;
+            romaji?: string;
+            type?: string;
+            direction?: AnalysisDirection;
+          }) => Promise<WordDetail>
+        ) => void;
       };
 
       const getDictionaryApi = (): DictionaryBridgeApi | undefined => {
@@ -726,6 +1046,20 @@ export function LegacyDesignFrame() {
       const renderDictionaryEntries = async (): Promise<void> => {
         const api = getDictionaryApi();
         if (!api) return;
+        // Wire the word-detail fetcher (idempotent; safe to call on every
+        // overlay open). The iframe stores it in closure until replaced.
+        // Kept here so the bridge owns the only call site that reaches
+        // into cd.* — dictionary.html never imports the service layer.
+        if (typeof api.setAnalyzeWordDetail === "function") {
+          api.setAnalyzeWordDetail((req) =>
+            cd.analyzeWordDetail({
+              surface: req.surface,
+              romaji: req.romaji,
+              type: req.type,
+              direction: req.direction,
+            })
+          );
+        }
         try {
           const entries = await dictionary.getAll();
           api.renderEntries(entries);
@@ -899,6 +1233,11 @@ export function LegacyDesignFrame() {
         direction?: AnalysisDirection;
         lyrics?: string;
         isDemo?: boolean;
+        // Slot-memory rehydration data. Populated by openLyric when the
+        // bridge finds a saved lyric session whose songId matches this
+        // ctx. lyric.html's `open()` applies it atomically with lyrics
+        // load so the restored state renders in one paint.
+        hydrate?: LyricHydrationPayload;
       }
       interface LyricBridgeApi {
         open: (ctx: LyricOpenContext) => void;
@@ -937,6 +1276,7 @@ export function LegacyDesignFrame() {
           ) => Promise<WordDetail>
         ) => void;
         setClose: (fn: () => void) => void;
+        setOnSessionChange: (fn: (snapshot: LyricSessionSnapshot) => void) => void;
       }
 
       const getLyricApi = (): LyricBridgeApi | undefined => {
@@ -1030,7 +1370,31 @@ export function LegacyDesignFrame() {
         });
 
         api.setClose(() => closeLyricOverlay());
+
+        // Autosave the lyric session on every lyric-UI state change that
+        // matters (lyrics loaded, line analyzed, view/direction/active-line
+        // updated). songId is computed once per open and stays stable for
+        // the session — switching tracks re-enters wireLyricCallbacks with
+        // a fresh ctx and a new songId, so each track's saves target the
+        // right record.
+        api.setOnSessionChange((snapshot) => {
+          autosaveLyricSession(songId, snapshot);
+        });
       };
+
+      const whenLyricApiReady = (): Promise<void> => {
+        if (getLyricApi()) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          // `once: true` cleans the listener up once the iframe loads.
+          lyricFrame?.addEventListener("load", () => resolve(), { once: true });
+        });
+      };
+
+      // Rapid-click protection: if the user opens track A then
+      // immediately opens track B, A's hydration IIFE might still be
+      // pending. Each call bumps the token; late IIFEs bail if the
+      // token moved on.
+      let lyricOpenToken = 0;
 
       const openLyric = (ctx: LyricOpenContext): void => {
         if (!lyricOverlay || !lyricFrame) return;
@@ -1040,18 +1404,51 @@ export function LegacyDesignFrame() {
         }
         lyricOverlay.classList.add("open");
 
-        const push = () => {
+        // Kick off the slot lookup and the iframe-ready wait in parallel.
+        // Single paint happens once both resolve — no blank-then-populate
+        // flicker. The lookup is localStorage + one Dexie query; its cost
+        // is well under the iframe load time on first open and trivial
+        // on re-open.
+        const myToken = ++lyricOpenToken;
+        const hydrationPromise = resolveLyricHydration(
+          {
+            sourceTrackId: ctx.sourceTrackId,
+            songTitle: ctx.songTitle,
+            artistName: ctx.artistName,
+          },
+          stableSongId(ctx)
+        );
+
+        void (async () => {
+          const [hit] = await Promise.all([
+            hydrationPromise,
+            whenLyricApiReady(),
+          ]);
+          // Another openLyric call arrived while we were waiting — the
+          // newer call owns the overlay now, so drop this result.
+          if (myToken !== lyricOpenToken) return;
           const api = getLyricApi();
           if (!api) return;
-          wireLyricCallbacks(api, ctx);
-          api.open(ctx);
-        };
 
-        if (getLyricApi()) {
-          push();
-        } else {
-          lyricFrame.addEventListener("load", push, { once: true });
-        }
+          // Merge saved fields the caller didn't supply — don't stomp on
+          // freshly-fetched lyrics/direction (e.g. YouTube Music). That
+          // also lines up with the guardrail: hydration never overwrites
+          // an explicit caller-provided value.
+          const finalCtx: LyricOpenContext = hit
+            ? {
+                ...ctx,
+                direction: ctx.direction ?? hit.session.direction,
+                lyrics:
+                  typeof ctx.lyrics === "string" && ctx.lyrics.trim().length > 0
+                    ? ctx.lyrics
+                    : (hit.session.lyrics ?? undefined),
+                hydrate: hit.payload,
+              }
+            : ctx;
+
+          wireLyricCallbacks(api, finalCtx);
+          api.open(finalCtx);
+        })();
       };
 
       const onLyricCloseClick = (): void => closeLyricOverlay();

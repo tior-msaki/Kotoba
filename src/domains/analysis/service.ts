@@ -126,7 +126,17 @@ export async function analyzeLine(
       req.stanzaNumber,
       req.lineNumber
     );
-    if (cached) return cached;
+    // Treat a cached analysis with an empty `words` array on a non-empty
+    // source line as a miss. The Llama-70B provider occasionally drops
+    // the per-word breakdown on lines with contracted/compound verb
+    // forms (e.g. 燃やして, 手放した, 呆れた) — that bad shape used to
+    // end up cached and replayed on every re-click, so token cards
+    // never showed. Re-running through the fresh path + retry below
+    // self-heals those entries without any manual cache wipe.
+    // Lines with legit populated words are untouched.
+    if (cached && !(cached.words.length === 0 && trimmedLine.length > 0)) {
+      return cached;
+    }
   }
 
   const prompt = buildLinePrompt(req);
@@ -144,7 +154,7 @@ export async function analyzeLine(
   //     where the model drops that field entirely (especially for
   //     en-ja analyses where the schema field name is `japanese` but
   //     the source is English).
-  const result = parseLine(raw, req.stanzaNumber, direction, req.lineNumber, req.line);
+  let result = parseLine(raw, req.stanzaNumber, direction, req.lineNumber, req.line);
   if (result === null) {
     // Normalizer couldn't recover a usable line shape. With the
     // blank-input guard above this is effectively "the model returned
@@ -153,6 +163,40 @@ export async function analyzeLine(
       "The analysis provider returned no translation for this line. Try again in a moment."
     );
   }
+
+  // Targeted retry for the "empty words array on a valid Japanese line"
+  // quirk. The schema and the system prompt already require `words` to
+  // be populated, but the 70B model sometimes cuts the array short on
+  // lines with contracted/compound forms. One focused re-ask reliably
+  // recovers the breakdown for those lines. Guarded by the empty-words
+  // condition so working lines never see a second round-trip.
+  if (result.words.length === 0 && trimmedLine.length > 0) {
+    try {
+      const retryPrompt =
+        prompt +
+        "\n\nIMPORTANT — the previous response was missing the per-word breakdown. The `words` array in your JSON MUST contain every token in the source line, in order of appearance: particles (の, は, を, が, …), auxiliaries (ない, て, た, だ, …), verb stems and their conjugated endings, adjectives, and nouns. Do NOT return an empty `words` array. Every other field must remain consistent with the schema.";
+      const retryRaw = await callNvidiaStructured<LineAnalysisResponse>({
+        prompt: retryPrompt,
+        responseSchema: LINE_ANALYSIS_CONTRACT as Record<string, unknown>,
+      });
+      const retryResult = parseLine(
+        retryRaw,
+        req.stanzaNumber,
+        direction,
+        req.lineNumber,
+        req.line
+      );
+      if (retryResult !== null && retryResult.words.length > 0) {
+        result = retryResult;
+      }
+    } catch {
+      // Retry failed (upstream 4xx/5xx, JSON parse, etc.). Fall back to
+      // the original partial result so the user still sees direct and
+      // cultural translation — strict no-regression for the working
+      // parts of the line. No infinite loops; retry is one-shot.
+    }
+  }
+
   if (!options.skipCache) {
     await cacheLine(songId, result);
   }
