@@ -1,0 +1,2329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kotoba — Lyrics</title>
+<link href="https://fonts.googleapis.com/css2?family=Forum&family=Gamja+Flower&family=Noto+Serif+JP:wght@400;700&family=Linux+Libertine:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100vh;
+  background: transparent;
+  overflow: hidden;
+  color: #000;
+  font-family: 'Linux Libertine', 'Times New Roman', serif;
+}
+
+body {
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+body.page-ready { opacity: 1; }
+
+/* ── Fixed 1440×1024 stage (matches home.html / diskbox.html / disk-select.html) ── */
+.viewport {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lyric-stage {
+  position: relative;
+  width: 1440px;
+  height: 1024px;
+  transform-origin: center center;
+  flex-shrink: 0;
+  background: #ffffff;
+}
+
+/* ── Paper surface — same shadow/border language as the dictionary book ── */
+.surface {
+  position: absolute;
+  left: 48px;
+  top: 36px;
+  width: 1344px;
+  height: 952px;
+  background: #ffffff;
+  border: 1px solid #000;
+  box-shadow: 3px 5px 22px rgba(0,0,0,0.55);
+  padding: 22px 30px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Top strip ── */
+.surface-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1.5px solid #000;
+  flex-shrink: 0;
+}
+.title-block {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.back-btn {
+  width: 42px;
+  height: 42px;
+  background: transparent url("assets/disk%20select/left%20arrow.png") no-repeat center/contain;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.back-btn:hover { opacity: 0.7; }
+
+.song-title {
+  font-family: 'Forum', serif;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+.song-artist {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 22px;
+  opacity: 0.7;
+  margin-left: 10px;
+}
+/* Viewing-state sub-label — same hand-drawn tag language as .song-artist
+   and the direction toggle label. Sits under the title block so the
+   surface always declares what song is open and how far along the user
+   is, matching the "now playing / now viewing" desk metaphor. */
+.song-status {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 15px;
+  opacity: 0.55;
+  letter-spacing: 0.03em;
+  margin-top: 2px;
+}
+.song-status::before {
+  content: "♫";
+  margin-right: 6px;
+  opacity: 0.75;
+}
+
+.direction-toggle {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.direction-toggle .toggle-lbl {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 16px;
+  opacity: 0.7;
+  margin-right: 4px;
+}
+.dir-btn {
+  padding: 4px 10px;
+  font-family: 'Noto Serif JP', 'Times New Roman', serif;
+  font-size: 13px;
+  font-weight: 700;
+  background: #d0d0d0;
+  color: #000;
+  border: 1px solid #000;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.dir-btn:hover { background: #e8e8e8; }
+.dir-btn.active { background: #ffffff; }
+
+/* "translate all" — runs every line through cd.analyzeLine. Visible only
+   once lyrics have been loaded (the JS flips `hidden`). Uses the same
+   paper language as the Forum ghost buttons in the rest of the app. */
+.translate-all-btn {
+  margin-left: 10px;
+  padding: 5px 12px;
+  font-family: 'Forum', serif;
+  font-size: 14px;
+  background: #ffffff;
+  border: 1px solid #000;
+  color: #000;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.translate-all-btn:hover { background: #f2eadd; }
+.translate-all-btn:disabled { opacity: 0.55; cursor: wait; }
+
+/* ── Book-style view tabs (mirrors dictionary.html tab language) ── */
+.view-tabs {
+  display: flex;
+  gap: 2px;
+  margin-top: 10px;
+  margin-bottom: -1px;
+  padding: 0 2px;
+  user-select: none;
+  position: relative;
+  z-index: 3;
+  flex-shrink: 0;
+}
+.view-tab {
+  background: #d0d0d0;
+  color: #000;
+  border: 1px solid #000;
+  border-bottom: none;
+  font-family: 'Noto Serif JP', 'Times New Roman', serif;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 5px 14px 4px;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.12s;
+  border-radius: 5px 5px 0 0;
+  box-shadow: 0 -1px 4px rgba(0,0,0,0.15);
+  position: relative;
+  bottom: -1px;
+}
+.view-tab:hover { background: #e8e8e8; }
+.view-tab.active {
+  background: #ffffff;
+  border-bottom-color: #ffffff;
+  z-index: 4;
+  box-shadow: 0 -2px 6px rgba(0,0,0,0.12);
+}
+
+/* ── Split content panes ── */
+.content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  border: 1px solid #000;
+  position: relative;
+  z-index: 1;
+}
+.lyrics-pane {
+  width: 58%;
+  border-right: 1px solid #000;
+  padding: 14px 22px;
+  overflow: auto;
+  background: #fffdfa;
+}
+.analysis-pane {
+  flex: 1;
+  padding: 14px 22px;
+  overflow: auto;
+  background: #ffffff;
+}
+
+/* ── Demo / hint banner ── */
+.demo-banner {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 14px;
+  padding: 4px 10px;
+  background: #fff3c2;
+  border: 0.5px solid #000;
+  align-self: flex-start;
+  margin-bottom: 10px;
+  letter-spacing: 0.02em;
+}
+
+/* ── Stanza + line typography ── */
+.stanza { margin-bottom: 14px; }
+.stanza-label {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 14px;
+  opacity: 0.55;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+  padding-left: 2px;
+}
+.stanza-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 4px 2px;
+}
+.stanza-nav .counter {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.line {
+  display: block;
+  padding: 5px 8px;
+  font-family: 'Noto Serif JP', 'Linux Libertine', serif;
+  font-size: 17px;
+  line-height: 1.45;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  border-left: 2px solid transparent;
+  margin: 1px 0;
+}
+.line:hover { background: #f2eadd; }
+.line.analyzed { background: #fff7e6; }
+.line.active {
+  background: #ffe9b6;
+  border-left-color: #000;
+  padding-left: 6px;
+}
+.line.single-line {
+  font-size: 23px;
+  padding: 16px 12px;
+  margin: 14px 0;
+}
+/* Line view: whole lyrics are visible; the active line gets larger type so
+   the selected line feels like the focus without hiding its neighbours. */
+.line.line-focus {
+  font-size: 21px;
+  padding: 10px 10px;
+}
+.line.line-focus.active {
+  font-size: 23px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+/* Stanza accordion — matches the dictionary's paper-tab visual tone. */
+.stanza-row {
+  border: 0.75px solid #000;
+  margin-bottom: 8px;
+  background: #fffdfa;
+}
+.stanza-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+  background: #f5edde;
+  border-bottom: 0.75px solid transparent;
+  transition: background 0.12s;
+}
+.stanza-row-head:hover { background: #ede2cf; }
+.stanza-row.expanded .stanza-row-head {
+  background: #ffffff;
+  border-bottom-color: #000;
+}
+.stanza-row-head .stanza-num {
+  font-family: 'Forum', serif;
+  font-size: 16px;
+}
+.stanza-row-head .stanza-teaser {
+  flex: 1;
+  margin: 0 10px;
+  font-family: 'Noto Serif JP', 'Linux Libertine', serif;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+.stanza-row-head .stanza-chevron {
+  font-family: Georgia, serif;
+  font-size: 13px;
+  opacity: 0.55;
+}
+.stanza-row-head .stanza-progress {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 13px;
+  opacity: 0.55;
+  margin-right: 8px;
+}
+.stanza-row-body {
+  display: none;
+  padding: 6px 10px 8px;
+}
+.stanza-row.expanded .stanza-row-body { display: block; }
+
+/* Synthesized grammar / cultural notes in the line analysis pane. */
+.grammar-notes {
+  margin: 8px 0 4px;
+  padding: 6px 8px;
+  border: 0.5px solid #000;
+  background: #fffaf0;
+}
+.grammar-notes .grammar-lbl {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 13px;
+  opacity: 0.6;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+.grammar-notes .grammar-group {
+  margin-top: 4px;
+  font-family: 'Linux Libertine', serif;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.grammar-notes .grammar-group-lbl {
+  font-style: italic;
+  opacity: 0.7;
+  margin-right: 4px;
+}
+.grammar-notes .grammar-item {
+  display: inline-block;
+  margin-right: 8px;
+}
+.grammar-notes .grammar-item .g-surface {
+  font-family: 'Noto Serif JP', 'Linux Libertine', serif;
+  font-weight: 700;
+}
+
+/* Word-card progressive disclosure — replaces the old single kanji expand.
+   The `.w-details` block holds both the kanji breakdown and the
+   conjugations placeholder, revealed only when `.expanded` is toggled. */
+.word-card .w-details {
+  display: none;
+  margin-top: 6px;
+  border-top: 0.5px dashed #000;
+  padding-top: 6px;
+}
+.word-card.expanded .w-details { display: block; }
+.word-card .w-details-section {
+  margin-top: 4px;
+}
+.word-card .w-details-section-lbl {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 12px;
+  opacity: 0.6;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+.word-card .w-details-note {
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.7;
+}
+/* Deep-analyze button — the single dedicated explicit control that
+   fetches the conjugation / alternatives / example content. Uses the
+   existing ghost-btn language so it reads as an in-family action. */
+.word-card .deep-fetch-row {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.word-card .deep-fetch-row .deep-fetch-btn {
+  font-family: 'Forum', serif;
+  font-size: 13px;
+  background: #ffffff;
+  border: 0.75px solid #000;
+  padding: 3px 10px;
+  cursor: pointer;
+  color: #000;
+}
+.word-card .deep-fetch-row .deep-fetch-btn:hover { background: #f2eadd; }
+.word-card .deep-fetch-row .deep-fetch-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.word-card .deep-fetch-status {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 13px;
+  opacity: 0.65;
+}
+
+/* Conjugation / alternatives / example sentence lists — compact, in
+   the existing Linux Libertine / Noto Serif JP tone. No tables; inline
+   rows keep the card narrow and readable. */
+.word-card .conj-list,
+.word-card .alt-list,
+.word-card .ex-list {
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.word-card .conj-item,
+.word-card .alt-item,
+.word-card .ex-item {
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.word-card .conj-item .conj-form,
+.word-card .alt-item .alt-register {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 12px;
+  opacity: 0.65;
+  margin-right: 4px;
+  letter-spacing: 0.03em;
+}
+.word-card .conj-item .conj-surface,
+.word-card .alt-item .alt-surface {
+  font-family: 'Noto Serif JP', 'Linux Libertine', serif;
+  font-weight: 700;
+}
+.word-card .conj-item .conj-reading,
+.word-card .conj-item .conj-romaji,
+.word-card .alt-item .alt-romaji {
+  font-style: italic;
+  opacity: 0.65;
+  margin-left: 4px;
+  font-size: 11.5px;
+}
+.word-card .conj-item .conj-desc,
+.word-card .alt-item .alt-note {
+  font-size: 11.5px;
+  opacity: 0.6;
+  margin-left: 4px;
+}
+.word-card .ex-item .ex-source {
+  font-family: 'Noto Serif JP', 'Linux Libertine', serif;
+  font-weight: 600;
+}
+.word-card .ex-item .ex-translation {
+  opacity: 0.75;
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+/* Song / stanza overview panels shown in the analysis pane when no
+   individual line is active. Reuses the .trans-block / .trans-lbl /
+   .trans-text language already used by line analysis. */
+.overview-tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 4px;
+}
+.overview-tally .tally-item {
+  font-family: 'Linux Libertine', serif;
+  font-size: 13px;
+  padding: 1px 6px;
+  border: 0.5px solid #000;
+  background: #fffdfa;
+}
+.overview-tally .tally-item .tally-count {
+  font-style: italic;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+/* ── Selection-analyze floating strip ── */
+.selection-strip {
+  display: none;
+  position: sticky;
+  bottom: 0;
+  background: #fffdfa;
+  border-top: 1px dashed #000;
+  padding: 6px 4px 4px;
+  margin-top: 12px;
+  font-family: 'Gamja Flower', cursive;
+  font-size: 15px;
+}
+.selection-strip.open { display: block; }
+.selection-strip-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.selection-strip .selected-preview {
+  font-family: 'Noto Serif JP', 'Linux Libertine', serif;
+  font-size: 13px;
+  opacity: 0.75;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Hidden by default; revealed only when user clicks "❓ ask". Keeps the
+   strip compact and avoids chat-UI shapes — it's a one-line input in the
+   current font/palette language (Noto Serif for the question text,
+   ghost-btn actions, thin black border under the selected excerpt). */
+.selection-ask-row {
+  display: none;
+  margin-top: 6px;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 0.5px dashed #000;
+  flex-wrap: wrap;
+}
+.selection-strip.asking .selection-ask-row { display: flex; }
+.selection-ask-row .question-input {
+  flex: 1;
+  min-width: 180px;
+  font-family: 'Noto Serif JP', 'Linux Libertine', serif;
+  font-size: 14px;
+  padding: 4px 6px;
+  border: 0;
+  border-bottom: 1px solid #000;
+  background: transparent;
+  outline: none;
+}
+.selection-ask-row .question-input::placeholder {
+  font-family: 'Gamja Flower', cursive;
+  opacity: 0.55;
+}
+
+/* Answer card rendered in the analysis pane when the user asks a
+   question. Same note-paper palette as the line analysis blocks; the
+   `answer-body` respects newlines so bullet-style lists render inline. */
+.answer-card { }
+.answer-card .answer-question {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 18px;
+  margin-bottom: 6px;
+  line-height: 1.35;
+}
+.answer-card .answer-question::before {
+  content: "❓ ";
+  opacity: 0.8;
+}
+.answer-card .answer-selection {
+  font-family: 'Noto Serif JP', 'Linux Libertine', serif;
+  font-size: 14px;
+  font-style: italic;
+  padding: 6px 10px;
+  margin: 6px 0 10px;
+  border-left: 3px solid #000;
+  background: #fffaf0;
+  white-space: pre-wrap;
+}
+.answer-card .answer-body {
+  font-family: 'Linux Libertine', serif;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* ── Analysis pane content ── */
+.section-headline {
+  font-family: 'Forum', serif;
+  font-size: 22px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #000;
+  padding-bottom: 4px;
+}
+.analysis-headline {
+  font-family: 'Noto Serif JP', 'Linux Libertine', serif;
+  font-size: 20px;
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+.analysis-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  min-height: 16px;
+}
+.meta-romaji {
+  font-family: 'Linux Libertine', serif;
+  font-style: italic;
+  font-size: 13px;
+  opacity: 0.7;
+}
+.meta-direction {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 13px;
+  opacity: 0.55;
+  letter-spacing: 0.04em;
+}
+
+.trans-block { margin-bottom: 12px; }
+.trans-lbl {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 13px;
+  opacity: 0.6;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+.trans-text {
+  font-family: 'Linux Libertine', serif;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.word-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.word-card {
+  border: 0.75px solid #000;
+  padding: 7px 10px;
+  background: #fff;
+  font-family: 'Linux Libertine', serif;
+  font-size: 13px;
+  line-height: 1.35;
+  cursor: pointer;
+  transition: background 0.12s, box-shadow 0.12s;
+}
+.word-card:hover { background: #fffdfa; }
+/* Focused word: same paper/warm-tone language already used by
+   .line.active and the demo banner — a thick black rule on the left and
+   a soft warm background lift. Avoid novel pill/badge shapes. */
+.word-card.focused {
+  background: #fffaf0;
+  border-left: 3px solid #000;
+  padding-left: 8px;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.15);
+}
+.word-card.focused .w-surface {
+  font-size: 17px;
+}
+/* The expanded block + action row must not inherit the card's pointer
+   cursor — they have their own interactive controls inside. */
+.word-card .card-actions,
+.word-card .w-details {
+  cursor: default;
+}
+.word-card .w-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.word-card .w-surface {
+  font-family: 'Noto Serif JP', serif;
+  font-weight: 700;
+  font-size: 15px;
+}
+.word-card .w-rom {
+  font-style: italic;
+  opacity: 0.7;
+}
+.word-card .w-pos {
+  font-style: italic;
+  opacity: 0.6;
+  font-size: 11px;
+}
+.word-card .w-trans {
+  font-style: italic;
+  opacity: 0.55;
+  font-size: 11px;
+}
+.word-card .w-meaning {
+  display: block;
+  margin-top: 3px;
+}
+.kanji-entry { margin-bottom: 4px; font-size: 12px; }
+.kanji-entry .k-char {
+  font-family: 'Noto Serif JP', serif;
+  font-weight: 700;
+  font-size: 16px;
+  margin-right: 6px;
+}
+.kanji-entry .k-sub {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 1px;
+}
+
+.card-actions {
+  margin-top: 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action-bar {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 0.5px solid #000;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.action-btn {
+  font-family: 'Forum', serif;
+  font-size: 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  color: #000;
+}
+.action-btn:hover { opacity: 0.7; }
+.action-status {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+/* ── Empty / pasting state ── */
+.empty-pane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 28px;
+  gap: 12px;
+}
+.empty-pane .big {
+  font-family: 'Forum', serif;
+  font-size: 26px;
+}
+.empty-pane .note {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 18px;
+  opacity: 0.7;
+  max-width: 36ch;
+  line-height: 1.4;
+}
+.empty-pane textarea {
+  width: 100%;
+  min-height: 170px;
+  font-family: 'Noto Serif JP', 'Linux Libertine', serif;
+  font-size: 14px;
+  padding: 10px;
+  border: 1px solid #000;
+  background: #fffdfa;
+  resize: vertical;
+  line-height: 1.4;
+}
+.empty-pane .btn-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.empty-pane .ghost-btn {
+  font-family: 'Forum', serif;
+  font-size: 17px;
+  background: #ffffff;
+  border: 1px solid #000;
+  padding: 5px 14px;
+  cursor: pointer;
+}
+.empty-pane .ghost-btn:hover { background: #f2eadd; }
+
+/* ── Scrollbars (minimal, matches desk tone) ── */
+.lyrics-pane::-webkit-scrollbar,
+.analysis-pane::-webkit-scrollbar { width: 8px; }
+.lyrics-pane::-webkit-scrollbar-thumb,
+.analysis-pane::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.3);
+  border-radius: 4px;
+}
+</style>
+</head>
+<body>
+
+<div class="viewport">
+  <div class="lyric-stage">
+    <div class="surface">
+
+      <div class="surface-header">
+        <div class="title-block">
+          <button class="back-btn" id="backBtn" title="Back to desk"></button>
+          <div>
+            <div>
+              <span class="song-title" id="songTitle">—</span>
+              <span class="song-artist" id="songArtist"></span>
+            </div>
+            <div class="song-status" id="songStatus">waiting for a song</div>
+          </div>
+        </div>
+        <div class="direction-toggle">
+          <span class="toggle-lbl">direction</span>
+          <button class="dir-btn" id="dirJaEn" type="button">JA → EN</button>
+          <button class="dir-btn" id="dirEnJa" type="button">EN → JA</button>
+          <button class="translate-all-btn" id="translateAllBtn" type="button" hidden>translate all</button>
+        </div>
+      </div>
+
+      <div class="view-tabs" id="viewTabs">
+        <button class="view-tab" data-view="all" type="button">all</button>
+        <button class="view-tab" data-view="stanza" type="button">stanza</button>
+        <button class="view-tab" data-view="line" type="button">line</button>
+        <button class="view-tab" data-view="word" type="button">word</button>
+      </div>
+
+      <div class="content">
+        <div class="lyrics-pane" id="lyricsPane"></div>
+        <div class="analysis-pane" id="analysisPane"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   LYRIC INTERFACE
+   ─────────────────────────────────────────────
+   Static HTML overlay — all backend calls run through the React bridge
+   (src/frontend/LegacyDesignFrame.tsx) via the __kotobaLyric API below.
+
+   Public API:
+     window.__kotobaLyric.open(context)          — { songTitle, artistName, sourceTrackId?, direction?, lyrics? }
+     window.__kotobaLyric.setAnalyzeLine(fn)     — async (lineText, lineNumber, stanzaNumber, direction) => AnalysisLine
+     window.__kotobaLyric.setSaveLine(fn)        — async (analysisLine, context) => ExportResult
+     window.__kotobaLyric.setSaveWord(fn)        — async (word, analysisLine, context) => WordExportOutcome
+     window.__kotobaLyric.setClose(fn)           — () => void   (called by the "←" back button)
+
+   The save functions write to the real Dexie-backed dictionary via
+   services/app.ts (cd.saveLineToDictionary / cd.saveWordToDictionary).
+═══════════════════════════════════════════════ */
+(function () {
+  // ─── State ──────────────────────────────────────────────────────────
+  var state = {
+    context: null,         // { songTitle, artistName, sourceTrackId, direction }
+    lyrics: null,          // { stanzas: [[line, line], [line]] }
+    direction: 'ja-en',
+    view: 'all',           // 'all' | 'stanza' | 'line' | 'word'
+    activeStanzaIndex: 0,
+    activeLineRef: null,   // { stanzaIndex, lineIndex }
+    analysisMap: new Map(),// key = `${stanzaIndex}:${lineIndex}` -> AnalysisLine
+    selectionAnalysis: null, // AnalysisLine returned by "analyze selection"
+    selectionAnswer: null,   // { text, question, answer } returned by "❓ ask"
+    pendingQuestionText: null, // captured selection while the ask input is open
+    lastAttemptedAsk: null,    // { text, question } for retry after a failed ask
+    lastAttemptedSelection: null, // last selection text for retry
+    // Word-detail cache for the "fetch conjugations & examples" control.
+    // Session-local; keyed by `${direction}:${surface}`. Values are either
+    // a WordDetail object (loaded) or { loading: true } (in flight) or
+    // { error: string } (last attempt failed).
+    wordDetailMap: new Map(),
+    busy: false,
+    lastError: null,
+    isDemo: false
+  };
+
+  // ─── Callbacks supplied by the React bridge ────────────────────────
+  var callbacks = {
+    analyzeLine: null,
+    saveLine: null,
+    saveWord: null,
+    askQuestion: null,
+    analyzeWordDetail: null,
+    close: null
+  };
+
+  // ─── Demo lyrics (explicit fallback — only loaded when the user
+  //     clicks "use demo" or the overlay is opened in hash-demo mode) ──
+  var DEMO_JA = [
+    '光の中で目を覚ます',
+    '風が頬を撫でる',
+    '今日も歩き出す',
+    '',
+    '小さな声で',
+    '君の名を呼んだ',
+    '返事はないけれど'
+  ].join('\n');
+
+  var DEMO_EN = [
+    'I awoke in the morning light',
+    'The wind was soft against my face',
+    'I set out walking once again',
+    '',
+    'In a quiet voice I called your name',
+    'Though there was no reply',
+    'I kept on walking'
+  ].join('\n');
+
+  // ─── Part-of-speech labels (matches dictionary.html) ───────────────
+  var POS_LABEL = {
+    'noun': 'n.', 'particle': 'part.', 'verb': 'v.',
+    'ru-verb': 'v.', 'godan-verb': 'v.', 'verb-exception': 'v.',
+    'adjective': 'adj.', 'adverb': 'adv.', 'conjunction': 'conj.',
+    'interjection': 'interj.', 'pronoun': 'pron.', 'counter': 'ctr.',
+    'prefix': 'pref.', 'suffix': 'suf.', 'auxiliary': 'aux.',
+    'expression': 'expr.'
+  };
+
+  // ─── DOM refs ──────────────────────────────────────────────────────
+  var lyricsPane = document.getElementById('lyricsPane');
+  var songStatusEl = document.getElementById('songStatus');
+  var analysisPane = document.getElementById('analysisPane');
+  var songTitleEl = document.getElementById('songTitle');
+  var songArtistEl = document.getElementById('songArtist');
+  var viewTabsEl = document.getElementById('viewTabs');
+  var dirJaEnBtn = document.getElementById('dirJaEn');
+  var dirEnJaBtn = document.getElementById('dirEnJa');
+  var backBtn = document.getElementById('backBtn');
+  var translateAllBtn = document.getElementById('translateAllBtn');
+
+  // ─── Helpers ───────────────────────────────────────────────────────
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function splitLyrics(raw) {
+    if (!raw) return { stanzas: [] };
+    var blocks = String(raw).replace(/\r/g, '').split(/\n{2,}/);
+    var stanzas = [];
+    for (var i = 0; i < blocks.length; i++) {
+      var lines = blocks[i].split(/\n/).map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
+      if (lines.length > 0) stanzas.push(lines);
+    }
+    return { stanzas: stanzas };
+  }
+
+  function detectDirection(raw) {
+    return /[\u3040-\u30ff\u3400-\u9fff]/.test(String(raw || '')) ? 'ja-en' : 'en-ja';
+  }
+
+  function lineKey(si, li) { return si + ':' + li; }
+
+  function currentContext() {
+    return {
+      songTitle: (state.context && state.context.songTitle) || 'Unknown',
+      artistName: (state.context && state.context.artistName) || 'Unknown',
+      sourceTrackId: state.context && state.context.sourceTrackId,
+      direction: state.direction
+    };
+  }
+
+  // ─── Header / direction / view state ───────────────────────────────
+  function setTitle(title, artist) {
+    songTitleEl.textContent = title || '—';
+    songArtistEl.textContent = artist ? 'by ' + artist : '';
+  }
+
+  function setDirection(d, _fromUser) {
+    state.direction = d === 'en-ja' ? 'en-ja' : 'ja-en';
+    dirJaEnBtn.classList.toggle('active', state.direction === 'ja-en');
+    dirEnJaBtn.classList.toggle('active', state.direction === 'en-ja');
+  }
+
+  function setView(v) {
+    if (v !== 'all' && v !== 'stanza' && v !== 'line' && v !== 'word') v = 'all';
+    state.view = v;
+    var tabs = viewTabsEl.querySelectorAll('.view-tab');
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].classList.toggle('active', tabs[i].getAttribute('data-view') === v);
+    }
+    renderLyrics();
+    renderAnalysis();
+  }
+
+  /**
+   * Dynamic "now viewing" indicator under the title — keeps the user
+   * oriented as state moves from "song opened, no lyrics" to
+   * "lyrics ready" to "N lines analyzed". Rendered in Gamja Flower to
+   * match the desk's hand-drawn hint language.
+   */
+  function refreshSongStatus() {
+    if (!songStatusEl) return;
+    if (!state.context) {
+      songStatusEl.textContent = 'waiting for a song';
+      return;
+    }
+    if (!state.lyrics || state.lyrics.stanzas.length === 0) {
+      songStatusEl.textContent = 'song opened · lyrics not loaded yet';
+      return;
+    }
+    var totalLines = 0;
+    for (var si = 0; si < state.lyrics.stanzas.length; si++) {
+      totalLines += state.lyrics.stanzas[si].length;
+    }
+    var analyzed = state.analysisMap.size;
+    if (analyzed === 0) {
+      songStatusEl.textContent = 'lyrics ready · ' + totalLines + ' line' + (totalLines === 1 ? '' : 's');
+      return;
+    }
+    songStatusEl.textContent = analyzed + ' of ' + totalLines + ' line' +
+      (totalLines === 1 ? '' : 's') + ' analyzed';
+  }
+
+  /**
+   * Show/hide the "translate all" button based on whether lyrics are
+   * loaded. Called from the same render path as refreshSongStatus so
+   * header state stays consistent.
+   */
+  function refreshTranslateAllBtn() {
+    if (!translateAllBtn) return;
+    var hasLyrics = !!(state.lyrics && state.lyrics.stanzas.length > 0);
+    translateAllBtn.hidden = !hasLyrics;
+  }
+
+  /**
+   * "Translate all" — iterates every line through the existing
+   * callbacks.analyzeLine pipeline in sequence (bounded to 1 at a time
+   * client-side so we don't fan out N simultaneous LLM calls).
+   * Skips lines that are already analyzed. Progress is surfaced via
+   * songStatusEl; the concatenated output shows up in the "all" view's
+   * analysis pane (renderSongOverview already joins culturalTranslations).
+   */
+  async function translateAllLines() {
+    if (!translateAllBtn) return;
+    if (!state.lyrics || !callbacks.analyzeLine) return;
+    translateAllBtn.disabled = true;
+    var originalLabel = translateAllBtn.textContent;
+    translateAllBtn.textContent = 'translating…';
+    var stanzas = state.lyrics.stanzas;
+    var total = 0;
+    for (var s0 = 0; s0 < stanzas.length; s0++) total += stanzas[s0].length;
+    var done = 0;
+    var failed = 0;
+    for (var si = 0; si < stanzas.length; si++) {
+      for (var li = 0; li < stanzas[si].length; li++) {
+        var key = lineKey(si, li);
+        if (state.analysisMap.has(key)) { done++; continue; }
+        try {
+          var result = await callbacks.analyzeLine(
+            stanzas[si][li],
+            li + 1,
+            si + 1,
+            state.direction
+          );
+          if (result && typeof result === 'object') {
+            state.analysisMap.set(key, result);
+          }
+        } catch (err) {
+          failed++;
+        }
+        done++;
+        refreshSongStatus();
+        // Light re-render so analyzed lines highlight progressively.
+        renderLyrics();
+      }
+    }
+    translateAllBtn.disabled = false;
+    translateAllBtn.textContent = originalLabel;
+    // Land the user on the 'all' view so they see the concatenated
+    // translated output in renderSongOverview.
+    state.activeLineRef = null;
+    setView('all');
+    if (failed > 0) {
+      state.lastError = failed + ' line' + (failed === 1 ? '' : 's') + ' failed to translate. Click them individually to retry.';
+      // Keep the view rendered but surface the error via songStatus.
+      if (songStatusEl) {
+        songStatusEl.textContent = 'translated ' + (total - failed) + ' of ' + total + ' lines · ' + failed + ' failed';
+      }
+    }
+  }
+
+  if (translateAllBtn) {
+    translateAllBtn.addEventListener('click', function () {
+      void translateAllLines();
+    });
+  }
+
+  // ─── Lyrics pane rendering ─────────────────────────────────────────
+  function renderEmptyLyrics() {
+    lyricsPane.innerHTML = '';
+    var pane = document.createElement('div');
+    pane.className = 'empty-pane';
+    pane.innerHTML =
+      '<div class="big">Paste song lyrics</div>'
+      + '<div class="note">Blank lines separate stanzas. Direction is auto-detected; you can override with the toggle above.</div>'
+      + '<textarea id="pasteLyrics" placeholder="paste lyrics here…"></textarea>'
+      + '<div class="btn-row">'
+      + '  <button class="ghost-btn" id="loadLyricsBtn" type="button">load</button>'
+      + '  <button class="ghost-btn" id="demoJaBtn" type="button">use demo (JA)</button>'
+      + '  <button class="ghost-btn" id="demoEnBtn" type="button">use demo (EN)</button>'
+      + '</div>';
+    lyricsPane.appendChild(pane);
+    document.getElementById('loadLyricsBtn').addEventListener('click', function () {
+      var v = document.getElementById('pasteLyrics').value.trim();
+      if (v.length === 0) return;
+      loadLyrics(v, false);
+    });
+    document.getElementById('demoJaBtn').addEventListener('click', function () {
+      setDirection('ja-en');
+      loadLyrics(DEMO_JA, true);
+    });
+    document.getElementById('demoEnBtn').addEventListener('click', function () {
+      setDirection('en-ja');
+      loadLyrics(DEMO_EN, true);
+    });
+  }
+
+  function loadLyrics(text, isDemo) {
+    state.lyrics = splitLyrics(text);
+    state.isDemo = !!isDemo;
+    state.analysisMap = new Map();
+    state.activeLineRef = null;
+    state.activeStanzaIndex = 0;
+    state.selectionAnalysis = null;
+    if (!state.context || !state.context.direction) {
+      setDirection(detectDirection(text));
+    }
+    renderLyrics();
+    renderAnalysis();
+  }
+
+  function lineHtml(si, li, text, opts) {
+    var key = lineKey(si, li);
+    var analyzed = state.analysisMap.has(key);
+    var active =
+      state.activeLineRef &&
+      state.activeLineRef.stanzaIndex === si &&
+      state.activeLineRef.lineIndex === li;
+    var cls = 'line';
+    if (analyzed) cls += ' analyzed';
+    if (active) cls += ' active';
+    if (opts && opts.single) cls += ' single-line';
+    if (opts && opts.focus) cls += ' line-focus';
+    return '<div class="' + cls + '" data-si="' + si + '" data-li="' + li + '">' + escapeHtml(text) + '</div>';
+  }
+
+  function renderLyrics() {
+    if (!state.lyrics || state.lyrics.stanzas.length === 0) {
+      renderEmptyLyrics();
+      return;
+    }
+
+    var html = '';
+    if (state.isDemo) {
+      html += '<div class="demo-banner">demo mode — explicit fallback lyrics, not real playlist data</div>';
+    }
+
+    var stanzas = state.lyrics.stanzas;
+    var view = state.view;
+
+    if (view === 'all' || view === 'word') {
+      // Whole-song scroll. Clicking any line analyzes it. The analysis
+      // pane differs by view (song-overview in 'all', word-cards in 'word').
+      for (var si = 0; si < stanzas.length; si++) {
+        html += '<div class="stanza">';
+        html += '<div class="stanza-label">Stanza ' + (si + 1) + '</div>';
+        for (var li = 0; li < stanzas[si].length; li++) {
+          html += lineHtml(si, li, stanzas[si][li]);
+        }
+        html += '</div>';
+      }
+    } else if (view === 'stanza') {
+      // Accordion: each stanza collapses/expands. Single-expanded so the
+      // surface stays skimmable. Lines inside the expanded stanza are
+      // clickable to analyze, same as any other view.
+      var expandedIdx = clampStanzaIdx(state.activeStanzaIndex);
+      for (var si3 = 0; si3 < stanzas.length; si3++) {
+        var isExpanded = si3 === expandedIdx;
+        var totalInStanza = stanzas[si3].length;
+        var analyzedInStanza = 0;
+        for (var li3 = 0; li3 < totalInStanza; li3++) {
+          if (state.analysisMap.has(lineKey(si3, li3))) analyzedInStanza++;
+        }
+        html += '<div class="stanza-row' + (isExpanded ? ' expanded' : '') + '">';
+        html += '<div class="stanza-row-head" data-stanza-toggle="' + si3 + '">'
+          + '<span class="stanza-num">Stanza ' + (si3 + 1) + '</span>'
+          + '<span class="stanza-teaser">' + escapeHtml(stanzas[si3][0] || '') + '</span>'
+          + '<span class="stanza-progress">' + analyzedInStanza + '/' + totalInStanza + '</span>'
+          + '<span class="stanza-chevron">' + (isExpanded ? '▾' : '▸') + '</span>'
+        + '</div>';
+        if (isExpanded) {
+          html += '<div class="stanza-row-body">';
+          for (var li4 = 0; li4 < totalInStanza; li4++) {
+            html += lineHtml(si3, li4, stanzas[si3][li4]);
+          }
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+    } else if (view === 'line') {
+      // Line mode: the whole lyric is visible so the user can see the line
+      // in its stanza context; the active line uses `.line-focus.active`
+      // for extra emphasis. No prev/next nav needed — click any line.
+      if (!state.activeLineRef) state.activeLineRef = { stanzaIndex: 0, lineIndex: 0 };
+      for (var si5 = 0; si5 < stanzas.length; si5++) {
+        html += '<div class="stanza">';
+        html += '<div class="stanza-label">Stanza ' + (si5 + 1) + '</div>';
+        for (var li5 = 0; li5 < stanzas[si5].length; li5++) {
+          html += lineHtml(si5, li5, stanzas[si5][li5], { focus: true });
+        }
+        html += '</div>';
+      }
+    }
+
+    // selection-strip is always present; shown on selection. It offers
+    // two paths side-by-side:
+    //   ✎ analyze → run the structured line-analysis pipeline over the
+    //                selected text (existing behavior)
+    //   ❓ ask    → expand a one-line question input and send the
+    //                selection + question to the backend for a short answer
+    html += '<div class="selection-strip" id="selectionStrip">'
+      + '<div class="selection-strip-row">'
+      +   '<span>analyze selection:</span>'
+      +   '<span class="selected-preview" id="selectionPreview"></span>'
+      +   '<button class="action-btn" id="analyzeSelectionBtn" type="button">✎ analyze</button>'
+      +   '<button class="action-btn" id="askSelectionBtn" type="button">❓ ask</button>'
+      + '</div>'
+      + '<div class="selection-ask-row" id="selectionAskRow">'
+      +   '<input type="text" class="question-input" id="selectionQuestion" '
+      +     'placeholder="what do you want to ask about this?" autocomplete="off" spellcheck="false" />'
+      +   '<button class="action-btn" id="submitSelectionQuestionBtn" type="button">ask</button>'
+      +   '<button class="action-btn" id="cancelSelectionAskBtn" type="button">cancel</button>'
+      + '</div>'
+    + '</div>';
+
+    lyricsPane.innerHTML = html;
+    wireLyricsEvents();
+  }
+
+  function clampStanzaIdx(i) {
+    if (!state.lyrics) return 0;
+    var max = state.lyrics.stanzas.length - 1;
+    if (i < 0) return 0;
+    if (i > max) return max;
+    return i;
+  }
+
+  function wireLyricsEvents() {
+    var nodes = lyricsPane.querySelectorAll('.line');
+    for (var i = 0; i < nodes.length; i++) {
+      (function (el) {
+        el.addEventListener('click', function () {
+          var si = parseInt(el.getAttribute('data-si'), 10);
+          var li = parseInt(el.getAttribute('data-li'), 10);
+          selectLine(si, li);
+        });
+      })(nodes[i]);
+    }
+
+    // Stanza accordion toggle: click the stanza row header to expand that
+    // stanza (single-expand, so the surface stays skimmable). Re-clicking
+    // an already-expanded stanza collapses it.
+    var toggles = lyricsPane.querySelectorAll('[data-stanza-toggle]');
+    for (var t = 0; t < toggles.length; t++) {
+      (function (el) {
+        el.addEventListener('click', function () {
+          var si = parseInt(el.getAttribute('data-stanza-toggle'), 10);
+          if (state.activeStanzaIndex === si) {
+            state.activeStanzaIndex = -1; // collapse-all toggle
+          } else {
+            state.activeStanzaIndex = si;
+          }
+          state.activeLineRef = null;
+          renderLyrics();
+          renderAnalysis();
+        });
+      })(toggles[t]);
+    }
+
+    var analyzeSelBtn = document.getElementById('analyzeSelectionBtn');
+    if (analyzeSelBtn) analyzeSelBtn.addEventListener('click', function () { void analyzeSelection(); });
+
+    // Ask flow: ❓ ask reveals the inline question input; submit sends the
+    // current selection (preserved in state.lastAttemptedSelection once
+    // the user clicks ask) + the question through callbacks.askQuestion.
+    var askBtn = document.getElementById('askSelectionBtn');
+    if (askBtn) askBtn.addEventListener('click', beginAskFlow);
+
+    var submitQBtn = document.getElementById('submitSelectionQuestionBtn');
+    if (submitQBtn) submitQBtn.addEventListener('click', submitSelectionQuestion);
+
+    var cancelQBtn = document.getElementById('cancelSelectionAskBtn');
+    if (cancelQBtn) cancelQBtn.addEventListener('click', cancelAskFlow);
+
+    var qInput = document.getElementById('selectionQuestion');
+    if (qInput) {
+      qInput.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          submitSelectionQuestion();
+        } else if (ev.key === 'Escape') {
+          cancelAskFlow();
+        }
+      });
+    }
+  }
+
+  // (moveLine / maybeFetchActiveLine were used by the old single-line
+  // prev/next nav; line mode now shows every line, so navigation happens
+  // by clicking the line directly.)
+
+  // ─── Selection handler (ask the backend about an arbitrary highlighted span) ──
+  function updateSelectionPreview() {
+    var sel = window.getSelection && window.getSelection();
+    var text = sel ? String(sel.toString() || '').trim() : '';
+    var strip = document.getElementById('selectionStrip');
+    var preview = document.getElementById('selectionPreview');
+    if (!strip || !preview) return;
+    if (text.length > 0 && lyricsPane.contains(sel.anchorNode)) {
+      preview.textContent = text;
+      strip.classList.add('open');
+    } else {
+      strip.classList.remove('open');
+      preview.textContent = '';
+    }
+  }
+
+  lyricsPane.addEventListener('mouseup', updateSelectionPreview);
+  lyricsPane.addEventListener('keyup', updateSelectionPreview);
+
+  async function analyzeSelection(overrideText) {
+    var text;
+    if (typeof overrideText === 'string' && overrideText.length > 0) {
+      text = overrideText;
+    } else {
+      var sel = window.getSelection && window.getSelection();
+      text = sel ? String(sel.toString() || '').trim() : '';
+    }
+    if (!text || text.length === 0) return;
+    if (!callbacks.analyzeLine) {
+      state.lastError = 'Analysis backend not connected.';
+      renderAnalysisError();
+      return;
+    }
+    state.busy = true;
+    state.selectionAnalysis = null;
+    state.lastAttemptedSelection = text;
+    renderAnalysisLoading('analyzing selected text…');
+    try {
+      var result = await callbacks.analyzeLine(text, 0, 0, state.direction);
+      if (result && typeof result === 'object') {
+        state.selectionAnalysis = result;
+        state.lastAttemptedSelection = null;
+      }
+    } catch (err) {
+      state.lastError = (err && err.message) ? err.message : String(err);
+      state.busy = false;
+      renderAnalysisError();
+      return;
+    }
+    state.busy = false;
+    renderSelectionAnalysis();
+  }
+
+  // ─── Ask-about-selection (free-form Q&A) ───────────────────────────
+  // When the user clicks "❓ ask":
+  //   1. Capture the current selection so the strip's "analyze/ask" row
+  //      stays usable even if the user clicks into the input and loses
+  //      the browser selection.
+  //   2. Reveal the inline question input (strip gains `.asking` class).
+  //   3. On submit, call callbacks.askQuestion with (text, question,
+  //      direction) → cd.askAboutSelection in the real backend.
+  //   4. Render the returned `answer` in the analysis pane via
+  //      renderSelectionAnswer (reuses the trans-block language).
+  function beginAskFlow() {
+    var sel = window.getSelection && window.getSelection();
+    var text = sel ? String(sel.toString() || '').trim() : '';
+    if (!text || text.length === 0) return;
+    state.pendingQuestionText = text;
+    var strip = document.getElementById('selectionStrip');
+    if (strip) strip.classList.add('asking');
+    var input = document.getElementById('selectionQuestion');
+    if (input) {
+      input.value = '';
+      // Wait a tick so the input is actually visible before focusing.
+      setTimeout(function () { try { input.focus(); } catch (e) {} }, 0);
+    }
+  }
+
+  function cancelAskFlow() {
+    state.pendingQuestionText = null;
+    var strip = document.getElementById('selectionStrip');
+    if (strip) strip.classList.remove('asking');
+    var input = document.getElementById('selectionQuestion');
+    if (input) input.value = '';
+  }
+
+  async function submitSelectionQuestion() {
+    var input = document.getElementById('selectionQuestion');
+    var question = input ? String(input.value || '').trim() : '';
+    var text = state.pendingQuestionText;
+    if (!text || text.length === 0 || question.length === 0) return;
+    if (!callbacks.askQuestion) {
+      state.lastError = 'Ask-question backend not connected.';
+      renderAnalysisError();
+      return;
+    }
+    // Collapse the strip's ask row so the lyrics pane stays clean while
+    // the answer renders on the right.
+    cancelAskFlow();
+    return askBackendAndRender(text, question);
+  }
+
+  async function askBackendAndRender(text, question) {
+    state.busy = true;
+    state.selectionAnswer = null;
+    state.lastAttemptedAsk = { text: text, question: question };
+    renderAnalysisLoading('thinking about your highlighted text…');
+    try {
+      var result = await callbacks.askQuestion(text, question, state.direction);
+      if (result && typeof result.answer === 'string') {
+        state.selectionAnswer = {
+          text: text,
+          question: question,
+          answer: result.answer
+        };
+        state.lastAttemptedAsk = null;
+      } else {
+        throw new Error('empty answer from backend');
+      }
+    } catch (err) {
+      state.lastError = (err && err.message) ? err.message : String(err);
+      state.busy = false;
+      renderAnalysisError();
+      return;
+    }
+    state.busy = false;
+    renderSelectionAnswer();
+  }
+
+  // ─── Line analysis orchestration ───────────────────────────────────
+  async function selectLine(si, li) {
+    state.activeLineRef = { stanzaIndex: si, lineIndex: li };
+    state.activeStanzaIndex = si;
+    state.selectionAnalysis = null;
+    state.selectionAnswer = null;
+    renderLyrics();
+
+    var key = lineKey(si, li);
+    if (state.analysisMap.has(key)) {
+      renderAnalysis();
+      return;
+    }
+
+    if (!callbacks.analyzeLine) {
+      state.lastError = 'Analysis backend not connected in this context.';
+      renderAnalysisError();
+      return;
+    }
+
+    state.busy = true;
+    renderAnalysisLoading('analyzing this line…');
+    try {
+      var lineText = state.lyrics.stanzas[si][li];
+      var result = await callbacks.analyzeLine(lineText, li + 1, si + 1, state.direction);
+      if (result && typeof result === 'object') {
+        state.analysisMap.set(key, result);
+      }
+    } catch (err) {
+      state.lastError = (err && err.message) ? err.message : String(err);
+      state.busy = false;
+      renderAnalysisError();
+      return;
+    }
+    state.busy = false;
+    renderLyrics();
+    renderAnalysis();
+  }
+
+  // ─── Analysis pane rendering ───────────────────────────────────────
+  function renderEmptyAnalysis() {
+    if (!state.lyrics || state.lyrics.stanzas.length === 0) {
+      analysisPane.innerHTML =
+        '<div class="empty-pane">'
+        + '<div class="big">Analysis</div>'
+        + '<div class="note">Paste lyrics or load a demo on the left, then click any line.</div>'
+      + '</div>';
+      return;
+    }
+    analysisPane.innerHTML =
+      '<div class="empty-pane">'
+      + '<div class="big">Analysis</div>'
+      + '<div class="note">Click a line on the left to analyze it. Highlight a phrase then press ✎ to ask about just that selection.</div>'
+    + '</div>';
+  }
+
+  function renderAnalysisLoading(msg) {
+    analysisPane.innerHTML =
+      '<div class="empty-pane">'
+      + '<div class="big">analyzing…</div>'
+      + '<div class="note">' + escapeHtml(msg || '') + '</div>'
+    + '</div>';
+  }
+
+  function renderAnalysisError() {
+    // Show a compact, explicit retry control in the current visual
+    // language (ghost-btn, matching the empty-pane paste/demo buttons).
+    // Retry routes back through the real callbacks.analyzeLine or
+    // callbacks.askQuestion — there is no shadow path or local stub.
+    var pendingAsk = state.lastAttemptedAsk;
+    var pendingSelection = state.lastAttemptedSelection;
+    var canRetryLine = !!(state.activeLineRef && state.lyrics && state.lyrics.stanzas);
+    var retryLabel;
+    var canRetry = true;
+    if (pendingAsk) retryLabel = 'retry question';
+    else if (pendingSelection) retryLabel = 'retry selection';
+    else if (canRetryLine) retryLabel = 'retry line';
+    else canRetry = false;
+
+    analysisPane.innerHTML =
+      '<div class="empty-pane">'
+      + '<div class="big">analysis failed</div>'
+      + '<div class="note">' + escapeHtml(state.lastError || 'Unknown error') + '</div>'
+      + (canRetry
+          ? '<div class="btn-row">'
+            + '<button class="ghost-btn" id="retryAnalysisBtn" type="button">' + retryLabel + '</button>'
+          + '</div>'
+          : '')
+    + '</div>';
+    var btn = document.getElementById('retryAnalysisBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      state.lastError = null;
+      if (pendingAsk) {
+        void askBackendAndRender(pendingAsk.text, pendingAsk.question);
+        return;
+      }
+      if (pendingSelection) {
+        void analyzeSelection(pendingSelection);
+        return;
+      }
+      if (state.activeLineRef) {
+        var ref = state.activeLineRef;
+        void selectLine(ref.stanzaIndex, ref.lineIndex);
+      }
+    });
+  }
+
+  function renderAnalysis() {
+    refreshSongStatus();
+    refreshTranslateAllBtn();
+    if (state.selectionAnswer) { renderSelectionAnswer(); return; }
+    if (state.selectionAnalysis) { renderSelectionAnalysis(); return; }
+    if (state.view === 'word') { renderWordView(); return; }
+
+    // All / stanza / line views share the line-detail pane when a line is
+    // active. When nothing is active, each view shows its own overview so
+    // the analysis pane never goes blank after lyrics are loaded.
+    var ref = state.activeLineRef;
+    var analysis = ref ? state.analysisMap.get(lineKey(ref.stanzaIndex, ref.lineIndex)) : null;
+    if (analysis) {
+      renderLineAnalysisView();
+      return;
+    }
+    if (state.view === 'all') { renderSongOverview(); return; }
+    if (state.view === 'stanza') { renderStanzaOverview(); return; }
+    renderEmptyAnalysis();
+  }
+
+  function renderLineAnalysisView() {
+    var ref = state.activeLineRef;
+    if (!ref) { renderEmptyAnalysis(); return; }
+    var analysis = state.analysisMap.get(lineKey(ref.stanzaIndex, ref.lineIndex));
+    if (!analysis) { renderEmptyAnalysis(); return; }
+
+    var html = lineAnalysisHtml(analysis, 'Line ' + (ref.lineIndex + 1) + ' · Stanza ' + (ref.stanzaIndex + 1), ref);
+    analysisPane.innerHTML = html;
+    wireAnalysisEvents();
+  }
+
+  // ─── Overview panels (all mode + stanza mode) ───────────────────────
+  function renderSongOverview() {
+    if (!state.lyrics || state.lyrics.stanzas.length === 0) { renderEmptyAnalysis(); return; }
+    var stanzas = state.lyrics.stanzas;
+    var totalLines = 0;
+    for (var si = 0; si < stanzas.length; si++) totalLines += stanzas[si].length;
+    var analyzedCount = state.analysisMap.size;
+
+    var html = '';
+    html += '<div class="section-headline">Song Overview</div>';
+
+    html += '<div class="trans-block">'
+      + '<div class="trans-lbl">song</div>'
+      + '<div class="trans-text">'
+      +   escapeHtml((state.context && state.context.songTitle) || 'Unknown')
+      +   (state.context && state.context.artistName
+          ? ' <span style="opacity:0.6;">— ' + escapeHtml(state.context.artistName) + '</span>'
+          : '')
+      + '</div>'
+    + '</div>';
+
+    html += '<div class="trans-block">'
+      + '<div class="trans-lbl">progress</div>'
+      + '<div class="trans-text">' + analyzedCount + ' of ' + totalLines + ' line' + (totalLines === 1 ? '' : 's') + ' analyzed</div>'
+    + '</div>';
+
+    if (analyzedCount > 0) {
+      var culturalBits = [];
+      var tally = Object.create(null);
+      for (var si2 = 0; si2 < stanzas.length; si2++) {
+        for (var li2 = 0; li2 < stanzas[si2].length; li2++) {
+          var a = state.analysisMap.get(lineKey(si2, li2));
+          if (!a) continue;
+          if (a.culturalTranslation) culturalBits.push(a.culturalTranslation);
+          (a.words || []).forEach(function (w) {
+            if (!w.type) return;
+            tally[w.type] = (tally[w.type] || 0) + 1;
+          });
+        }
+      }
+      if (culturalBits.length > 0) {
+        html += '<div class="trans-block">'
+          + '<div class="trans-lbl">cultural translation (analyzed lines so far)</div>'
+          + '<div class="trans-text">' + culturalBits.map(escapeHtml).join('<br>') + '</div>'
+        + '</div>';
+      }
+      var tallyKeys = Object.keys(tally);
+      if (tallyKeys.length > 0) {
+        tallyKeys.sort(function (a, b) { return tally[b] - tally[a]; });
+        var tallyHtml = '<div class="overview-tally">';
+        for (var k = 0; k < tallyKeys.length; k++) {
+          tallyHtml += '<span class="tally-item">' + escapeHtml(POS_LABEL[tallyKeys[k]] || tallyKeys[k])
+            + '<span class="tally-count">×' + tally[tallyKeys[k]] + '</span></span>';
+        }
+        tallyHtml += '</div>';
+        html += '<div class="trans-block">'
+          + '<div class="trans-lbl">grammar / key-term tally</div>'
+          + tallyHtml
+        + '</div>';
+      }
+    } else {
+      html += '<div class="trans-block">'
+        + '<div class="trans-lbl">what to do next</div>'
+        + '<div class="trans-text">Click any line in the lyrics pane to analyze it. The overview updates as you go.</div>'
+      + '</div>';
+    }
+
+    analysisPane.innerHTML = html;
+    wireAnalysisEvents();
+  }
+
+  function renderStanzaOverview() {
+    if (!state.lyrics || state.lyrics.stanzas.length === 0) { renderEmptyAnalysis(); return; }
+    var si = clampStanzaIdx(state.activeStanzaIndex);
+    if (state.activeStanzaIndex < 0) {
+      // Fully-collapsed accordion: fall back to the song-level overview.
+      renderSongOverview();
+      return;
+    }
+    var stanza = state.lyrics.stanzas[si];
+    if (!stanza) { renderEmptyAnalysis(); return; }
+
+    var analyzedCount = 0;
+    var culturalBits = [];
+    for (var li = 0; li < stanza.length; li++) {
+      var a = state.analysisMap.get(lineKey(si, li));
+      if (a) {
+        analyzedCount++;
+        if (a.culturalTranslation) culturalBits.push(a.culturalTranslation);
+      }
+    }
+
+    var html = '';
+    html += '<div class="section-headline">Stanza ' + (si + 1) + '</div>';
+    html += '<div class="trans-block">'
+      + '<div class="trans-lbl">progress</div>'
+      + '<div class="trans-text">' + analyzedCount + ' of ' + stanza.length + ' line' + (stanza.length === 1 ? '' : 's') + ' analyzed</div>'
+    + '</div>';
+    if (culturalBits.length > 0) {
+      html += '<div class="trans-block">'
+        + '<div class="trans-lbl">what this stanza says (so far)</div>'
+        + '<div class="trans-text">' + culturalBits.map(escapeHtml).join('<br>') + '</div>'
+      + '</div>';
+    }
+    html += '<div class="trans-block">'
+      + '<div class="trans-lbl">what to do next</div>'
+      + '<div class="trans-text">Click any line inside this stanza to analyze it.</div>'
+    + '</div>';
+
+    analysisPane.innerHTML = html;
+    wireAnalysisEvents();
+  }
+
+  // ─── Grammar / cultural notes synthesis ─────────────────────────────
+  // Today the backend doesn't return a dedicated grammarNotes field; for
+  // this step we derive a compact "grammar & cultural notes" block from
+  // the per-word POS + transitivity + meaningInContext the backend does
+  // return. Particles, verbs, and the first few key nouns surface here;
+  // raw word cards still live below in case the user wants to drill in.
+  function synthesizeGrammarNotes(words) {
+    if (!words || words.length === 0) return null;
+    var groups = [];
+    var particles = words.filter(function (w) { return w.type === 'particle'; });
+    if (particles.length > 0) {
+      groups.push({
+        label: 'particles',
+        items: particles.map(function (p) {
+          return { surface: p.surface, meaning: p.meaningInContext || '' };
+        })
+      });
+    }
+    var verbTypes = { 'verb': 1, 'ru-verb': 1, 'godan-verb': 1, 'verb-exception': 1 };
+    var verbs = words.filter(function (w) { return verbTypes[w.type]; });
+    if (verbs.length > 0) {
+      groups.push({
+        label: 'verbs',
+        items: verbs.map(function (v) {
+          var t = v.transitivity && v.transitivity !== null
+            ? ' · ' + v.transitivity
+            : '';
+          return { surface: v.surface + t, meaning: v.meaningInContext || '' };
+        })
+      });
+    }
+    var nouns = words.filter(function (w) { return w.type === 'noun'; }).slice(0, 4);
+    if (nouns.length > 0) {
+      groups.push({
+        label: 'key terms',
+        items: nouns.map(function (n) {
+          return { surface: n.surface, meaning: n.meaningInContext || '' };
+        })
+      });
+    }
+    return groups.length > 0 ? groups : null;
+  }
+
+  function grammarNotesHtml(words) {
+    var groups = synthesizeGrammarNotes(words);
+    if (!groups) return '';
+    var html = '<div class="grammar-notes">'
+      + '<div class="grammar-lbl">grammar &amp; cultural notes</div>';
+    for (var g = 0; g < groups.length; g++) {
+      var grp = groups[g];
+      html += '<div class="grammar-group">'
+        + '<span class="grammar-group-lbl">' + escapeHtml(grp.label) + ':</span>';
+      for (var i = 0; i < grp.items.length; i++) {
+        var it = grp.items[i];
+        html += '<span class="grammar-item">'
+          + '<span class="g-surface">' + escapeHtml(it.surface) + '</span>'
+          + (it.meaning ? ' — ' + escapeHtml(it.meaning) : '')
+        + '</span>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderSelectionAnalysis() {
+    var html = lineAnalysisHtml(state.selectionAnalysis, 'Selection', { stanzaIndex: -1, lineIndex: -1 });
+    html += '<div class="action-bar">'
+      + '<button class="action-btn" id="clearSelectionBtn" type="button">← back to line</button>'
+    + '</div>';
+    analysisPane.innerHTML = html;
+    wireAnalysisEvents();
+    var back = document.getElementById('clearSelectionBtn');
+    if (back) back.addEventListener('click', function () {
+      state.selectionAnalysis = null;
+      renderAnalysis();
+    });
+  }
+
+  function renderSelectionAnswer() {
+    var a = state.selectionAnswer;
+    if (!a) { renderEmptyAnalysis(); return; }
+    var html = '';
+    html += '<div class="section-headline">You asked</div>';
+    html += '<div class="answer-card">';
+    html +=   '<div class="answer-question">' + escapeHtml(a.question) + '</div>';
+    html +=   '<div class="trans-lbl">about</div>';
+    html +=   '<div class="answer-selection">' + escapeHtml(a.text) + '</div>';
+    html +=   '<div class="trans-lbl">answer</div>';
+    html +=   '<div class="answer-body">' + escapeHtml(a.answer) + '</div>';
+    html += '</div>';
+    html += '<div class="action-bar">'
+      + '<button class="action-btn" id="askAnotherBtn" type="button">ask another</button>'
+      + '<button class="action-btn" id="dismissAnswerBtn" type="button">dismiss</button>'
+    + '</div>';
+    analysisPane.innerHTML = html;
+    var again = document.getElementById('askAnotherBtn');
+    if (again) again.addEventListener('click', function () {
+      // Keep the same highlighted text but open the input for a new question.
+      state.pendingQuestionText = a.text;
+      state.selectionAnswer = null;
+      renderAnalysis();
+      var strip = document.getElementById('selectionStrip');
+      if (strip) { strip.classList.add('open'); strip.classList.add('asking'); }
+      var preview = document.getElementById('selectionPreview');
+      if (preview) preview.textContent = a.text;
+      var input = document.getElementById('selectionQuestion');
+      if (input) { input.value = ''; try { input.focus(); } catch (e) {} }
+    });
+    var dismiss = document.getElementById('dismissAnswerBtn');
+    if (dismiss) dismiss.addEventListener('click', function () {
+      state.selectionAnswer = null;
+      renderAnalysis();
+    });
+  }
+
+  function lineAnalysisHtml(analysis, headline, ref) {
+    var html = '';
+    html += '<div class="section-headline">' + escapeHtml(headline) + '</div>';
+    html += '<div class="analysis-headline">' + escapeHtml(analysis.japanese || '') + '</div>';
+
+    var metaBits = [];
+    if (analysis.romaji && analysis.romaji.length > 0) {
+      metaBits.push('<span class="meta-romaji">' + escapeHtml(analysis.romaji) + '</span>');
+    }
+    metaBits.push('<span class="meta-direction">' + escapeHtml(analysis.direction || state.direction) + '</span>');
+    html += '<div class="analysis-meta">' + metaBits.join('') + '</div>';
+
+    html += '<div class="trans-block">'
+      + '<div class="trans-lbl">direct translation</div>'
+      + '<div class="trans-text">' + escapeHtml(analysis.directTranslation || '') + '</div>'
+    + '</div>';
+    html += '<div class="trans-block">'
+      + '<div class="trans-lbl">cultural translation</div>'
+      + '<div class="trans-text">' + escapeHtml(analysis.culturalTranslation || '') + '</div>'
+    + '</div>';
+
+    // Synthesized grammar / cultural notes — compact bullets of particles,
+    // verbs (with transitivity), and key nouns for this line. Sits above
+    // the full word list so the user gets the shape of the line before
+    // drilling in.
+    html += grammarNotesHtml(analysis.words);
+
+    html += '<div class="trans-lbl" style="margin-top:8px;">words · particles · key terms</div>';
+    html += '<div class="word-list">';
+    var words = analysis.words || [];
+    for (var wi = 0; wi < words.length; wi++) {
+      html += wordCardHtml(words[wi], wi, ref);
+    }
+    html += '</div>';
+
+    html += '<div class="action-bar">'
+      + '<button class="action-btn" id="saveLineBtn" type="button">save line to dictionary</button>'
+      + '<span class="action-status" id="saveLineStatus"></span>'
+    + '</div>';
+    return html;
+  }
+
+  function wordCardHtml(word, wi, ref) {
+    var rom = (word.romaji && word.romaji.length > 0)
+      ? '<span class="w-rom">' + escapeHtml(word.romaji) + '</span>'
+      : '';
+    var posRaw = word.type ? (POS_LABEL[word.type] || word.type) : '';
+    var pos = posRaw ? '<span class="w-pos">' + escapeHtml(posRaw) + '</span>' : '';
+    var transLabel = '';
+    if (word.transitivity && word.transitivity !== 'both') {
+      transLabel = '<span class="w-trans">(' + escapeHtml(word.transitivity) + ')</span>';
+    } else if (word.transitivity === 'both') {
+      transLabel = '<span class="w-trans">(trans./intr.)</span>';
+    }
+
+    var kanji = word.kanjiList || [];
+    var kanjiHtml = '';
+    if (kanji.length > 0) {
+      kanjiHtml += '<div class="w-details-section">';
+      kanjiHtml +=   '<div class="w-details-section-lbl">kanji</div>';
+      for (var k = 0; k < kanji.length; k++) {
+        var kj = kanji[k] || {};
+        kanjiHtml += '<div class="kanji-entry">'
+          + '<span class="k-char">' + escapeHtml(kj.character || '') + '</span>'
+          + '<span>' + escapeHtml(kj.meaning || '') + '</span>';
+        if ((kj.kunYomi || []).length > 0) {
+          kanjiHtml += '<div class="k-sub"><em>kun:</em> ' + escapeHtml(kj.kunYomi.join(', ')) + '</div>';
+        }
+        if ((kj.onYomi || []).length > 0) {
+          kanjiHtml += '<div class="k-sub"><em>on:</em> ' + escapeHtml(kj.onYomi.join(', ')) + '</div>';
+        }
+        if ((kj.nanori || []).length > 0) {
+          kanjiHtml += '<div class="k-sub"><em>nanori:</em> ' + escapeHtml(kj.nanori.join(', ')) + '</div>';
+        }
+        kanjiHtml += '</div>';
+      }
+      kanjiHtml += '</div>';
+    }
+
+    // Deep-analyze slot. The dedicated "fetch conjugations & examples"
+    // button is the only path to conjugations/alternatives/example
+    // sentences — nothing is pre-fetched, and the surface/meaning line
+    // in the collapsed card doesn't depend on any of this. Once a fetch
+    // resolves, the button is replaced by the structured content.
+    var cacheKey = state.direction + ':' + (word.surface || '');
+    var cached = state.wordDetailMap.get(cacheKey);
+    var deepHtml = '';
+    if (cached && cached.loading) {
+      deepHtml = '<div class="w-details-section">'
+        + '<div class="w-details-section-lbl">conjugations · alternatives · examples</div>'
+        + '<div class="deep-fetch-row">'
+        +   '<span class="deep-fetch-status">fetching conjugations…</span>'
+        + '</div>'
+      + '</div>';
+    } else if (cached && cached.error) {
+      deepHtml = '<div class="w-details-section">'
+        + '<div class="w-details-section-lbl">conjugations · alternatives · examples</div>'
+        + '<div class="deep-fetch-row">'
+        +   '<span class="deep-fetch-status">fetch failed: ' + escapeHtml(cached.error) + '</span>'
+        +   '<button class="deep-fetch-btn" type="button" data-deep-fetch="' + escapeHtml(cacheKey) + '">retry</button>'
+        + '</div>'
+      + '</div>';
+    } else if (cached && cached.detail) {
+      deepHtml = wordDeepDetailHtml(cached.detail);
+    } else {
+      // Not yet fetched — the explicit control per the spec.
+      deepHtml = '<div class="w-details-section">'
+        + '<div class="w-details-section-lbl">conjugations · alternatives · examples</div>'
+        + '<div class="deep-fetch-row">'
+        +   '<button class="deep-fetch-btn" type="button" data-deep-fetch="' + escapeHtml(cacheKey) + '">fetch conjugations &amp; examples ↓</button>'
+        + '</div>'
+      + '</div>';
+    }
+
+    var detailsHtml = '<div class="w-details">' + kanjiHtml + deepHtml + '</div>';
+
+    var moreBtn = '<button class="action-btn expand-btn" type="button">details ↓</button>';
+
+    return '<div class="word-card" data-si="' + ref.stanzaIndex + '" data-li="' + ref.lineIndex + '" data-wi="' + wi + '" data-word-key="' + escapeHtml(cacheKey) + '">'
+      + '<div class="w-head">'
+      +   '<span class="w-surface">' + escapeHtml(word.surface || '') + '</span>'
+      +   rom + pos + transLabel
+      + '</div>'
+      + '<span class="w-meaning">' + escapeHtml(word.meaningInContext || '') + '</span>'
+      + detailsHtml
+      + '<div class="card-actions">'
+      +   moreBtn
+      +   '<button class="action-btn save-word-btn" type="button">save word</button>'
+      +   '<span class="action-status save-word-status"></span>'
+      + '</div>'
+    + '</div>';
+  }
+
+  // Render WordDetail as three compact sections (conjugations,
+  // alternatives, examples). Each section is skipped when its array is
+  // empty so non-verb / non-applicable cards don't display empty shells.
+  function wordDeepDetailHtml(detail) {
+    var html = '';
+    var conj = (detail && detail.conjugations) || [];
+    var alts = (detail && detail.alternatives) || [];
+    var exs = (detail && detail.exampleSentences) || [];
+
+    if (conj.length > 0) {
+      html += '<div class="w-details-section">';
+      html += '<div class="w-details-section-lbl">conjugations</div>';
+      html += '<div class="conj-list">';
+      for (var i = 0; i < conj.length; i++) {
+        var c = conj[i] || {};
+        html += '<div class="conj-item">'
+          + '<span class="conj-form">' + escapeHtml(c.form || '') + ':</span>'
+          + '<span class="conj-surface">' + escapeHtml(c.surface || '') + '</span>'
+          + (c.reading && c.reading !== c.surface
+              ? '<span class="conj-reading">[' + escapeHtml(c.reading) + ']</span>'
+              : '')
+          + (c.romaji
+              ? '<span class="conj-romaji">(' + escapeHtml(c.romaji) + ')</span>'
+              : '')
+          + (c.description
+              ? '<span class="conj-desc">— ' + escapeHtml(c.description) + '</span>'
+              : '')
+        + '</div>';
+      }
+      html += '</div></div>';
+    }
+
+    if (alts.length > 0) {
+      html += '<div class="w-details-section">';
+      html += '<div class="w-details-section-lbl">alternatives</div>';
+      html += '<div class="alt-list">';
+      for (var j = 0; j < alts.length; j++) {
+        var a = alts[j] || {};
+        html += '<div class="alt-item">'
+          + '<span class="alt-register">' + escapeHtml(a.register || 'same') + ':</span>'
+          + '<span class="alt-surface">' + escapeHtml(a.surface || '') + '</span>'
+          + (a.romaji
+              ? '<span class="alt-romaji">(' + escapeHtml(a.romaji) + ')</span>'
+              : '')
+          + ' — ' + escapeHtml(a.meaning || '')
+          + (a.note
+              ? '<span class="alt-note"> · ' + escapeHtml(a.note) + '</span>'
+              : '')
+        + '</div>';
+      }
+      html += '</div></div>';
+    }
+
+    if (exs.length > 0) {
+      html += '<div class="w-details-section">';
+      html += '<div class="w-details-section-lbl">examples</div>';
+      html += '<div class="ex-list">';
+      for (var k = 0; k < exs.length; k++) {
+        var e = exs[k] || {};
+        html += '<div class="ex-item">'
+          + '<span class="ex-source">' + escapeHtml(e.source || '') + '</span>'
+          + '<span class="ex-translation">— ' + escapeHtml(e.translation || '') + '</span>'
+        + '</div>';
+      }
+      html += '</div></div>';
+    }
+
+    if (html.length === 0) {
+      // Model returned all-empty arrays (particle / proper noun etc.).
+      // Honest note instead of silent blank.
+      html = '<div class="w-details-section">'
+        + '<div class="w-details-section-lbl">conjugations · alternatives · examples</div>'
+        + '<div class="w-details-note">No conjugations, alternatives, or fresh examples returned for this word.</div>'
+      + '</div>';
+    }
+
+    return html;
+  }
+
+  function renderWordView() {
+    var rows = [];
+    state.analysisMap.forEach(function (analysis, key) {
+      var parts = key.split(':');
+      var si = parseInt(parts[0], 10);
+      var li = parseInt(parts[1], 10);
+      (analysis.words || []).forEach(function (w, wi) {
+        rows.push({ word: w, analysis: analysis, si: si, li: li, wi: wi });
+      });
+    });
+
+    if (rows.length === 0) {
+      analysisPane.innerHTML =
+        '<div class="empty-pane">'
+        + '<div class="big">No words yet</div>'
+        + '<div class="note">Open a line from the all / stanza / line views to get its word breakdown. Saved words land in your dictionary.</div>'
+      + '</div>';
+      return;
+    }
+    var html = '<div class="section-headline">Words (' + rows.length + ')</div>';
+    html += '<div class="word-list">';
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      html += wordCardHtml(r.word, r.wi, { stanzaIndex: r.si, lineIndex: r.li });
+    }
+    html += '</div>';
+    analysisPane.innerHTML = html;
+    wireAnalysisEvents();
+  }
+
+  function wireAnalysisEvents() {
+    var saveLineBtn = document.getElementById('saveLineBtn');
+    if (saveLineBtn) {
+      saveLineBtn.addEventListener('click', async function () {
+        var status = document.getElementById('saveLineStatus');
+        var analysis = state.selectionAnalysis || (function () {
+          var ref = state.activeLineRef;
+          return ref ? state.analysisMap.get(lineKey(ref.stanzaIndex, ref.lineIndex)) : null;
+        })();
+        if (!analysis) return;
+        if (!callbacks.saveLine) { status.textContent = 'save backend not connected'; return; }
+        status.textContent = 'saving…';
+        try {
+          var res = await callbacks.saveLine(analysis, currentContext());
+          var n = (res && (Number(res.inserted || 0) + Number(res.updated || 0))) || 0;
+          status.textContent = 'saved · ' + n + ' ' + (n === 1 ? 'word' : 'words');
+        } catch (err) {
+          status.textContent = 'save failed: ' + ((err && err.message) || 'unknown error');
+        }
+      });
+    }
+
+    var cards = analysisPane.querySelectorAll('.word-card');
+    for (var i = 0; i < cards.length; i++) {
+      (function (card) {
+        var expand = card.querySelector('.expand-btn');
+        var save = card.querySelector('.save-word-btn');
+        var status = card.querySelector('.save-word-status');
+
+        // Whole-card click → focus + auto-expand. Uses data already
+        // returned by the line analysis — no new backend call. Button
+        // clicks and clicks inside the expanded .w-details block are
+        // ignored so the card toggle doesn't hijack their behavior.
+        card.addEventListener('click', function (ev) {
+          var t = ev.target;
+          if (t && t.nodeType === 1) {
+            if (t.closest && (t.closest('.card-actions') || t.closest('.w-details'))) {
+              return;
+            }
+          }
+          var wasFocused = card.classList.contains('focused');
+          var sibs = analysisPane.querySelectorAll('.word-card.focused');
+          for (var s = 0; s < sibs.length; s++) {
+            if (sibs[s] !== card) sibs[s].classList.remove('focused');
+          }
+          if (wasFocused) {
+            // Second click on the focused card collapses + un-focuses.
+            card.classList.remove('focused');
+            card.classList.remove('expanded');
+          } else {
+            card.classList.add('focused');
+            card.classList.add('expanded');
+            if (typeof card.scrollIntoView === 'function') {
+              card.scrollIntoView({ block: 'nearest' });
+            }
+          }
+          if (expand) {
+            expand.textContent = card.classList.contains('expanded') ? 'details ↑' : 'details ↓';
+          }
+        });
+
+        if (expand) expand.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          card.classList.toggle('expanded');
+          expand.textContent = card.classList.contains('expanded') ? 'details ↑' : 'details ↓';
+        });
+        if (save) save.addEventListener('click', async function (ev) {
+          ev.stopPropagation();
+          if (!callbacks.saveWord) { status.textContent = 'save backend not connected'; return; }
+          var si = parseInt(card.getAttribute('data-si'), 10);
+          var li = parseInt(card.getAttribute('data-li'), 10);
+          var wi = parseInt(card.getAttribute('data-wi'), 10);
+          var analysis;
+          if (si === -1 || li === -1) {
+            analysis = state.selectionAnalysis;
+          } else {
+            analysis = state.analysisMap.get(lineKey(si, li));
+          }
+          if (!analysis || !analysis.words || !analysis.words[wi]) {
+            status.textContent = 'word not found';
+            return;
+          }
+          var word = analysis.words[wi];
+          status.textContent = 'saving…';
+          try {
+            var outcome = await callbacks.saveWord(word, analysis, currentContext());
+            var verb = outcome && outcome.action ? outcome.action : 'saved';
+            status.textContent = verb;
+          } catch (err) {
+            status.textContent = 'save failed: ' + ((err && err.message) || 'unknown error');
+          }
+        });
+
+        // Deep-fetch button (or retry button when a previous fetch failed).
+        // Lives inside .w-details, so card-level click handler ignores it
+        // via the `.closest('.w-details')` guard — we still stopPropagation
+        // defensively.
+        var deepBtn = card.querySelector('[data-deep-fetch]');
+        if (deepBtn) {
+          deepBtn.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            var si = parseInt(card.getAttribute('data-si'), 10);
+            var li = parseInt(card.getAttribute('data-li'), 10);
+            var wi = parseInt(card.getAttribute('data-wi'), 10);
+            var analysis;
+            if (si === -1 || li === -1) {
+              analysis = state.selectionAnalysis;
+            } else {
+              analysis = state.analysisMap.get(lineKey(si, li));
+            }
+            if (!analysis || !analysis.words || !analysis.words[wi]) return;
+            void fetchWordDetail(analysis.words[wi]);
+          });
+        }
+      })(cards[i]);
+    }
+  }
+
+  // Fetch (or re-fetch) deeper detail for one word. Writes intermediate
+  // {loading} / {error} / {detail} entries into state.wordDetailMap, then
+  // calls renderAnalysis to re-render just the analysis pane. Keeps the
+  // expanded card open across the transition by preserving `.expanded`
+  // class through the re-render (wordCardHtml always emits the details
+  // block; the expand toggle adds/removes the class via the card click).
+  async function fetchWordDetail(word) {
+    if (!callbacks.analyzeWordDetail) return;
+    var surface = word && word.surface ? word.surface : '';
+    if (!surface) return;
+    var key = state.direction + ':' + surface;
+    state.wordDetailMap.set(key, { loading: true });
+    renderAnalysis();
+    reExpandCardsWithKey(key);
+    try {
+      var detail = await callbacks.analyzeWordDetail(word, state.direction);
+      state.wordDetailMap.set(key, { detail: detail });
+    } catch (err) {
+      state.wordDetailMap.set(key, {
+        error: (err && err.message) ? err.message : 'fetch failed'
+      });
+    }
+    renderAnalysis();
+    reExpandCardsWithKey(key);
+  }
+
+  // Re-open the expanded panel on cards that match the given word-key so
+  // a fetch → re-render flow doesn't snap the card closed.
+  function reExpandCardsWithKey(key) {
+    var nodes = analysisPane.querySelectorAll('[data-word-key="' + cssEscape(key) + '"]');
+    for (var i = 0; i < nodes.length; i++) {
+      nodes[i].classList.add('expanded');
+      var btn = nodes[i].querySelector('.expand-btn');
+      if (btn) btn.textContent = 'details ↑';
+    }
+  }
+
+  // Minimal CSS attribute-value escape — we control the key shape
+  // (direction:surface) but surfaces can contain quotes / backslashes.
+  function cssEscape(s) {
+    return String(s).replace(/["\\]/g, '\\$&');
+  }
+
+  // ─── Direction + view + back button wiring ────────────────────────
+  // Changing direction invalidates any analyses produced under the old
+  // direction — their translation field is in the wrong target language
+  // and their word-type/kanji conventions assume the old source language.
+  // Drop in-memory analyses so the next click re-analyzes in the new
+  // direction. The cached lyric text itself stays.
+  function onDirectionChange(newDir) {
+    if (state.direction === newDir) return;
+    state.analysisMap = new Map();
+    state.selectionAnalysis = null;
+    state.selectionAnswer = null;
+    state.pendingQuestionText = null;
+    state.lastAttemptedAsk = null;
+    state.lastAttemptedSelection = null;
+    state.wordDetailMap = new Map();
+    setDirection(newDir, true);
+    renderLyrics();
+    renderAnalysis();
+  }
+  dirJaEnBtn.addEventListener('click', function () { onDirectionChange('ja-en'); });
+  dirEnJaBtn.addEventListener('click', function () { onDirectionChange('en-ja'); });
+
+  (function wireViewTabs() {
+    var tabs = viewTabsEl.querySelectorAll('.view-tab');
+    for (var i = 0; i < tabs.length; i++) {
+      (function (btn) {
+        btn.addEventListener('click', function () { setView(btn.getAttribute('data-view')); });
+      })(tabs[i]);
+    }
+  })();
+
+  backBtn.addEventListener('click', function () {
+    if (typeof callbacks.close === 'function') callbacks.close();
+  });
+
+  // ─── Public API for the React bridge ──────────────────────────────
+  window.__kotobaLyric = {
+    open: function (ctx) {
+      ctx = ctx || {};
+      state.context = {
+        songTitle: ctx.songTitle || 'Unknown Song',
+        artistName: ctx.artistName || 'Unknown Artist',
+        sourceTrackId: ctx.sourceTrackId,
+        direction: ctx.direction
+      };
+      setTitle(state.context.songTitle, state.context.artistName);
+      setDirection(ctx.direction || 'ja-en');
+      state.analysisMap = new Map();
+      state.activeLineRef = null;
+      state.activeStanzaIndex = 0;
+      state.selectionAnalysis = null;
+      state.selectionAnswer = null;
+      state.pendingQuestionText = null;
+      state.lastAttemptedAsk = null;
+      state.lastAttemptedSelection = null;
+      state.wordDetailMap = new Map();
+      state.isDemo = false;
+      state.view = 'all';
+      setView('all');
+
+      if (ctx.lyrics && typeof ctx.lyrics === 'string' && ctx.lyrics.trim().length > 0) {
+        loadLyrics(ctx.lyrics, !!ctx.isDemo);
+      } else {
+        state.lyrics = null;
+        renderEmptyLyrics();
+        renderEmptyAnalysis();
+      }
+    },
+    setAnalyzeLine: function (fn) { callbacks.analyzeLine = fn; },
+    setSaveLine: function (fn) { callbacks.saveLine = fn; },
+    setSaveWord: function (fn) { callbacks.saveWord = fn; },
+    setAskQuestion: function (fn) { callbacks.askQuestion = fn; },
+    setAnalyzeWordDetail: function (fn) { callbacks.analyzeWordDetail = fn; },
+    setClose: function (fn) { callbacks.close = fn; },
+    // for tests / debug
+    _getState: function () { return state; },
+    _loadLyrics: loadLyrics,
+    _DEMO_JA: DEMO_JA,
+    _DEMO_EN: DEMO_EN
+  };
+
+  // Initial paint
+  setTitle('Open a song', '');
+  setDirection('ja-en');
+  setView('all');
+  renderEmptyLyrics();
+  renderEmptyAnalysis();
+  refreshSongStatus();
+  refreshTranslateAllBtn();
+  requestAnimationFrame(function () { document.body.classList.add('page-ready'); });
+})();
+</script>
+</body>
+</html>

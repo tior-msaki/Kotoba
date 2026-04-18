@@ -1,11 +1,18 @@
 /**
- * Gemini request/response schema types.
+ * LLM request/response schema types.
  *
- * These types define the exact JSON shapes we send to and expect from Gemini.
- * They mirror the domain types but are intentionally separate — domain types
- * are what the app uses internally, these are what the API boundary looks like.
- * Parsers (built later) will map between the two.
+ * These types define the exact JSON shapes we send to and expect from the
+ * analysis model (currently NVIDIA's OpenAI-compatible chat-completions).
+ * They mirror the domain types but are intentionally separate — domain
+ * types are what the app uses internally, these are what the API boundary
+ * looks like. Parsers map between the two.
+ *
+ * Direction support: requests carry an `AnalysisDirection`. Responses stay
+ * shape-compatible across directions; empty-strings/empty-arrays are used
+ * for Japanese-specific fields (romaji, kanjiList) on en-ja responses.
  */
+
+import type { AnalysisDirection } from "./types";
 
 // ---------------------------------------------------------------------------
 // Shared response shapes (reused across line/stanza/song)
@@ -26,6 +33,7 @@ export interface GeminiWordResponse {
   type:
     | "noun"
     | "particle"
+    | "verb"
     | "ru-verb"
     | "godan-verb"
     | "verb-exception"
@@ -65,6 +73,8 @@ export interface LineAnalysisRequest {
   lineNumber: number;
   /** Optional surrounding lines for better context. */
   surroundingLines?: string[];
+  /** Analysis direction. Defaults to "ja-en" if omitted. */
+  direction?: AnalysisDirection;
 }
 
 export interface LineAnalysisResponse {
@@ -85,6 +95,8 @@ export interface StanzaAnalysisRequest {
   songTitle: string;
   artistName: string;
   stanzaNumber: number;
+  /** Analysis direction. Defaults to "ja-en" if omitted. */
+  direction?: AnalysisDirection;
 }
 
 export interface StanzaAnalysisResponse {
@@ -104,6 +116,8 @@ export interface SongAnalysisRequest {
   fullLyrics: string;
   songTitle: string;
   artistName: string;
+  /** Analysis direction. Defaults to "ja-en" if omitted. */
+  direction?: AnalysisDirection;
 }
 
 export interface SongAnalysisResponse {
@@ -135,4 +149,63 @@ export interface StanzaOverviewFromLinesResponse {
 export interface SongOverviewFromStanzasResponse {
   culturalTranslation: string;
   summary: string;
+}
+
+// ---------------------------------------------------------------------------
+// Ask-about-selection (free-form Q&A) — not a structured analysis, just a
+// short educational answer about an arbitrary highlighted span.
+// ---------------------------------------------------------------------------
+
+export interface AskAboutSelectionRequest {
+  /** Text the user highlighted in the lyrics pane. */
+  text: string;
+  /** Free-form question the user typed. */
+  question: string;
+  songTitle?: string;
+  artistName?: string;
+  /** Analysis direction. Defaults to "ja-en" if omitted. */
+  direction?: AnalysisDirection;
+}
+
+export interface AskAboutSelectionResponse {
+  /** Short educational answer in the TARGET language. */
+  answer: string;
+}
+
+// ---------------------------------------------------------------------------
+// Word detail (on-demand deeper word analysis)
+// ---------------------------------------------------------------------------
+
+export interface WordDetailRequest {
+  /** Surface form of the word to analyze. */
+  surface: string;
+  /** Romaji if the caller already has it (helps the prompt). */
+  romaji?: string;
+  /** POS if the caller already has it (hints conjugation behavior). */
+  type?: string;
+  songTitle?: string;
+  artistName?: string;
+  /** Analysis direction. Defaults to "ja-en" if omitted. */
+  direction?: AnalysisDirection;
+}
+
+export interface WordDetailResponse {
+  conjugations: Array<{
+    form: string;
+    surface: string;
+    reading: string;
+    romaji: string;
+    description: string;
+  }>;
+  alternatives: Array<{
+    register: string;
+    surface: string;
+    romaji: string;
+    meaning: string;
+    note: string;
+  }>;
+  exampleSentences: Array<{
+    source: string;
+    translation: string;
+  }>;
 }

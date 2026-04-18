@@ -8,7 +8,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "smoke": "tsx scripts/smoke-test-dictionary.ts",
+    "smoke:ui": "tsx scripts/smoke-test-dictionary-ui.ts",
+    "smoke:direction": "tsx scripts/smoke-test-analysis-direction.ts",
+    "smoke:lyric": "tsx scripts/smoke-test-lyric-ui.ts",
+    "smoke:integration": "tsx scripts/smoke-test-integration.ts",
+    "test": "npm run typecheck && npm run smoke && npm run smoke:ui && npm run smoke:direction && npm run smoke:lyric && npm run smoke:integration"
   },
   "repository": {
     "type": "git",
@@ -17,7 +22,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/tior-msaki/Kotoba/issues"
   },
@@ -28,13 +33,15 @@
     "@vitejs/plugin-react": "^4.7.0",
     "fake-indexeddb": "^6.2.5",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.2",
+    "typescript": "^5.7.2",
     "vite": "^5.4.21"
   },
   "dependencies": {
     "dexie": "^4.4.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-router-dom": "^7.14.1"
+    "react-router-dom": "^7.14.1",
+    "youtube-music-api": "^1.0.6",
+    "ytmusic-api": "^5.3.1"
   }
 }

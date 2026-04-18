@@ -1,5 +1,5 @@
 /**
- * Bounded parallelism for async work (e.g. several Gemini calls at once).
+ * Bounded parallelism for async work (e.g. several LLM calls at once).
  */
 
 export async function mapWithConcurrency<T, R>(

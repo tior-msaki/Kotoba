@@ -9,7 +9,6 @@ import type { PlaylistProvider, Playlist, SongMeta } from "./types";
 import { getAdapter, registerAdapter } from "./adapter";
 import { spotifyAdapter } from "./adapters/spotify";
 import { youtubeAdapter } from "./adapters/youtube";
-import { deezerAdapter } from "./adapters/deezer";
 import {
   getCachedPlaylist,
   cachePlaylist,
@@ -18,12 +17,21 @@ import {
 } from "./cache";
 
 // ---------------------------------------------------------------------------
-// Auto-register all adapters on import
+// Auto-register adapters on import.
+//
+// - Spotify uses a user-supplied Bearer token and hits api.spotify.com
+//   directly from the browser.
+// - YouTube Music talks to /api/ytmusic/… (Vite-mounted Node middleware
+//   backed by ytmusic-api), so it works in dev + preview. A production
+//   deployment without that middleware would need the equivalent endpoint
+//   hosted elsewhere.
+// - Deezer remains a stub; not registered. Callers that ask for "deezer"
+//   still get a clean "Provider not registered" from getAdapter() rather
+//   than a fake "adapter not implemented" error.
 // ---------------------------------------------------------------------------
 
 registerAdapter(spotifyAdapter);
 registerAdapter(youtubeAdapter);
-registerAdapter(deezerAdapter);
 
 // ---------------------------------------------------------------------------
 // Public API

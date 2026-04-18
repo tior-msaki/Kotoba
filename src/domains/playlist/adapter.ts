@@ -7,6 +7,7 @@
  */
 
 import type { PlaylistProvider, Playlist, SongMeta } from "./types";
+import { ProviderError } from "../../lib/errors";
 
 export interface PlaylistAdapter {
   readonly provider: PlaylistProvider;
@@ -31,7 +32,12 @@ export function registerAdapter(adapter: PlaylistAdapter): void {
 export function getAdapter(provider: PlaylistProvider): PlaylistAdapter {
   const adapter = adapters.get(provider);
   if (!adapter) {
-    throw new Error(`No adapter registered for provider: ${provider}`);
+    // Stubbed providers are deliberately not registered (see
+    // src/domains/playlist/service.ts). Surface a clean, typed error.
+    throw new ProviderError(
+      `Provider not registered: ${provider}`,
+      provider
+    );
   }
   return adapter;
 }

@@ -1,12 +1,20 @@
 /**
  * Analysis service — public API for the analysis domain.
  *
- * Orchestrates: check cache → build prompt → call Gemini → parse → cache → return.
+ * Orchestrates: check cache → build prompt → call NVIDIA → parse → cache → return.
  * Three entry points: analyzeLine, analyzeStanza, analyzeSong.
  */
 
-import type { AnalysisLine, AnalysisStanza, SongAnalysis } from "./types";
 import type {
+  AnalysisDirection,
+  AnalysisLine,
+  AnalysisStanza,
+  SongAnalysis,
+  WordDetail,
+} from "./types";
+import type {
+  AskAboutSelectionRequest,
+  AskAboutSelectionResponse,
   LineAnalysisRequest,
   StanzaAnalysisRequest,
   SongAnalysisRequest,
@@ -15,22 +23,34 @@ import type {
   SongAnalysisResponse,
   StanzaOverviewFromLinesResponse,
   SongOverviewFromStanzasResponse,
+  WordDetailRequest,
+  WordDetailResponse,
 } from "./schemas";
 import {
+  buildAskAboutSelectionPrompt,
   buildLinePrompt,
   buildStanzaPrompt,
   buildSongPrompt,
   buildStanzaOverviewFromLinesPrompt,
   buildSongOverviewFromStanzasPrompt,
+  buildWordDetailPrompt,
 } from "./prompts";
 import {
+  ASK_ABOUT_SELECTION_CONTRACT,
   LINE_ANALYSIS_CONTRACT,
   STANZA_ANALYSIS_CONTRACT,
   SONG_ANALYSIS_CONTRACT,
   STANZA_OVERVIEW_FROM_LINES_CONTRACT,
   SONG_OVERVIEW_FROM_STANZAS_CONTRACT,
+  WORD_DETAIL_CONTRACT,
 } from "./contracts";
-import { parseLine, parseStanza, parseSong } from "./parsers";
+import {
+  parseAskAnswer,
+  parseLine,
+  parseStanza,
+  parseSong,
+  parseWordDetail,
+} from "./parsers";
 import {
   getCachedLine,
   cacheLine,
@@ -41,7 +61,7 @@ import {
   cacheSongAnalysis,
   cacheSongStanzas,
 } from "./cache";
-import { callGeminiStructured } from "../../lib/gemini";
+import { callNvidiaStructured } from "../../lib/nvidia";
 import { mapWithConcurrency } from "../../lib/concurrency";
 import { splitPastedLyricsIntoStanzas } from "./lyricsSplit";
 import { AnalysisError } from "../../lib/errors";
@@ -54,10 +74,24 @@ export interface AnalysisOptions {
   /** Skip cache and re-analyze. Default: false. */
   forceRefresh?: boolean;
   /**
-   * Max parallel Gemini requests for bottom-up line batches.
+   * Skip reading AND writing the line cache for this call. Used for
+   * one-off analyses that don't map to a stable (stanzaNumber, lineNumber)
+   * — e.g. the lyric UI's "analyze selection" / ✎ path, which passes
+   * sentinel positions (0, 0) that would otherwise pollute the cache.
+   * Default: false.
+   */
+  skipCache?: boolean;
+  /**
+   * Max parallel NVIDIA requests for bottom-up line batches.
    * Lower this if you hit rate limits. Default: 4.
    */
-  maxConcurrentGemini?: number;
+  maxConcurrentLlm?: number;
+}
+
+function resolveDirection(
+  direction: AnalysisDirection | undefined
+): AnalysisDirection {
+  return direction === "en-ja" ? "en-ja" : "ja-en";
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +107,20 @@ export async function analyzeLine(
   songId: string,
   options: AnalysisOptions = {}
 ): Promise<AnalysisLine> {
-  if (!options.forceRefresh) {
+  const direction = resolveDirection(req.direction);
+
+  // User-facing guard: a blank line is a structural bug upstream
+  // (splitLyrics should filter those) — reject with an actionable
+  // message instead of letting the model burn a token budget and then
+  // surfacing a schema error.
+  const trimmedLine = typeof req.line === "string" ? req.line.trim() : "";
+  if (trimmedLine.length === 0) {
+    throw new AnalysisError(
+      "Cannot analyze an empty line. Make sure the lyric line contains text before translating."
+    );
+  }
+
+  if (!options.skipCache && !options.forceRefresh) {
     const cached = await getCachedLine(
       songId,
       req.stanzaNumber,
@@ -83,13 +130,32 @@ export async function analyzeLine(
   }
 
   const prompt = buildLinePrompt(req);
-  const raw = await callGeminiStructured<LineAnalysisResponse>({
+  const raw = await callNvidiaStructured<LineAnalysisResponse>({
     prompt,
     responseSchema: LINE_ANALYSIS_CONTRACT as Record<string, unknown>,
   });
 
-  const result = parseLine(raw, req.stanzaNumber);
-  await cacheLine(songId, result);
+  // Pass req.lineNumber AND req.line as authoritative overrides:
+  //   - lineNumber: the model often returns its own number (frequently 1)
+  //     which would desync cache read/write keys and force every repeat
+  //     click to re-fetch.
+  //   - line (source): the user's original line text wins over whatever
+  //     the model echoes in `raw.japanese`, and rescues the common case
+  //     where the model drops that field entirely (especially for
+  //     en-ja analyses where the schema field name is `japanese` but
+  //     the source is English).
+  const result = parseLine(raw, req.stanzaNumber, direction, req.lineNumber, req.line);
+  if (result === null) {
+    // Normalizer couldn't recover a usable line shape. With the
+    // blank-input guard above this is effectively "the model returned
+    // no translation" — surface that, not a schema-field error.
+    throw new AnalysisError(
+      "The analysis provider returned no translation for this line. Try again in a moment."
+    );
+  }
+  if (!options.skipCache) {
+    await cacheLine(songId, result);
+  }
 
   return result;
 }
@@ -106,18 +172,20 @@ export async function analyzeStanza(
   songId: string,
   options: AnalysisOptions = {}
 ): Promise<AnalysisStanza> {
+  const direction = resolveDirection(req.direction);
   if (!options.forceRefresh) {
     const cached = await getCachedStanza(songId, req.stanzaNumber);
     if (cached) return cached;
   }
 
   const prompt = buildStanzaPrompt(req);
-  const raw = await callGeminiStructured<StanzaAnalysisResponse>({
+  const raw = await callNvidiaStructured<StanzaAnalysisResponse>({
     prompt,
     responseSchema: STANZA_ANALYSIS_CONTRACT as Record<string, unknown>,
   });
 
-  const result = parseStanza(raw);
+  // req.stanza is the authoritative source text — see analyzeLine.
+  const result = parseStanza(raw, direction, req.stanza);
 
   // Cache the stanza and all its individual lines
   await Promise.all([
@@ -140,18 +208,24 @@ export async function analyzeSong(
   songId: string,
   options: AnalysisOptions = {}
 ): Promise<SongAnalysis> {
+  const direction = resolveDirection(req.direction);
   if (!options.forceRefresh) {
     const cached = await getCachedSong(songId);
     if (cached) return cached;
   }
 
   const prompt = buildSongPrompt(req);
-  const raw = await callGeminiStructured<SongAnalysisResponse>({
+  const raw = await callNvidiaStructured<SongAnalysisResponse>({
     prompt,
     responseSchema: SONG_ANALYSIS_CONTRACT as Record<string, unknown>,
   });
 
-  const result = parseSong(raw, req.fullLyrics);
+  // Derive per-stanza source text from the user's full lyrics so each
+  // parseStanza call gets an authoritative override — see analyzeLine.
+  const stanzaSourceOverrides = splitPastedLyricsIntoStanzas(req.fullLyrics).map(
+    (lines) => lines.join("\n")
+  );
+  const result = parseSong(raw, req.fullLyrics, direction, stanzaSourceOverrides);
 
   // Cache everything: song-level, stanza-level, and line-level
   await Promise.all([
@@ -171,15 +245,17 @@ async function finalizeStanzaFromAnalyzedLines(
   artistName: string,
   stanzaNumber: number,
   lines: string[],
-  lineResults: AnalysisLine[]
+  lineResults: AnalysisLine[],
+  direction: AnalysisDirection
 ): Promise<AnalysisStanza> {
-  const raw = await callGeminiStructured<StanzaOverviewFromLinesResponse>({
+  const raw = await callNvidiaStructured<StanzaOverviewFromLinesResponse>({
     prompt: buildStanzaOverviewFromLinesPrompt({
       songTitle,
       artistName,
       stanzaNumber,
       stanzaJapanese: lines.join("\n"),
       lines: lineResults,
+      direction,
     }),
     responseSchema: STANZA_OVERVIEW_FROM_LINES_CONTRACT as Record<
       string,
@@ -190,6 +266,7 @@ async function finalizeStanzaFromAnalyzedLines(
   return {
     japanese: lines.join("\n"),
     stanzaNumber,
+    direction,
     directTranslation: raw.directTranslation,
     culturalTranslation: raw.culturalTranslation,
     summary: raw.summary,
@@ -199,7 +276,7 @@ async function finalizeStanzaFromAnalyzedLines(
 
 /**
  * Analyze each line in a stanza individually (bounded parallelism), then
- * one stanza-level Gemini pass for direct/cultural translation and summary.
+ * one stanza-level NVIDIA pass for direct/cultural translation and summary.
  */
 export async function analyzeStanzaByLines(
   lines: string[],
@@ -207,9 +284,10 @@ export async function analyzeStanzaByLines(
   artistName: string,
   stanzaNumber: number,
   songId: string,
-  options: AnalysisOptions = {}
+  options: AnalysisOptions & { direction?: AnalysisDirection } = {}
 ): Promise<AnalysisStanza> {
-  const concurrency = options.maxConcurrentGemini ?? 4;
+  const concurrency = options.maxConcurrentLlm ?? 4;
+  const direction = resolveDirection(options.direction);
 
   const lineResults = await mapWithConcurrency(
     lines,
@@ -223,6 +301,7 @@ export async function analyzeStanzaByLines(
           stanzaNumber,
           lineNumber: i + 1,
           surroundingLines: lines,
+          direction,
         },
         songId,
         options
@@ -234,7 +313,8 @@ export async function analyzeStanzaByLines(
     artistName,
     stanzaNumber,
     lines,
-    lineResults
+    lineResults,
+    direction
   );
 
   await cacheStanza(songId, composed);
@@ -247,10 +327,12 @@ export interface AnalyzeSongBottomUpParams {
   artistName: string;
   /** Raw pasted lyrics; blank lines separate stanzas, newlines separate lines. */
   fullLyrics: string;
+  /** Analysis direction. Defaults to "ja-en" if omitted. */
+  direction?: AnalysisDirection;
 }
 
 /**
- * Bottom-up song analysis: lines (parallel Gemini) → stanza overview per stanza →
+ * Bottom-up song analysis: lines (parallel NVIDIA calls) → stanza overview per stanza →
  * song-level overview. Caches lines, stanzas, and the full song like {@link analyzeSong}.
  */
 export async function analyzeSongBottomUp(
@@ -258,7 +340,8 @@ export async function analyzeSongBottomUp(
   options: AnalysisOptions = {}
 ): Promise<SongAnalysis> {
   const { songId, songTitle, artistName, fullLyrics } = params;
-  const concurrency = options.maxConcurrentGemini ?? 4;
+  const concurrency = options.maxConcurrentLlm ?? 4;
+  const direction = resolveDirection(params.direction);
 
   if (!options.forceRefresh) {
     const cached = await getCachedSong(songId);
@@ -290,6 +373,7 @@ export async function analyzeSongBottomUp(
             stanzaNumber,
             lineNumber: i + 1,
             surroundingLines: lines,
+            direction,
           },
           songId,
           options
@@ -301,7 +385,8 @@ export async function analyzeSongBottomUp(
       artistName,
       stanzaNumber,
       lines,
-      lineResults
+      lineResults,
+      direction
     );
 
     await Promise.all([
@@ -312,12 +397,13 @@ export async function analyzeSongBottomUp(
     stanzas.push(stanza);
   }
 
-  const songRaw = await callGeminiStructured<SongOverviewFromStanzasResponse>({
+  const songRaw = await callNvidiaStructured<SongOverviewFromStanzasResponse>({
     prompt: buildSongOverviewFromStanzasPrompt({
       songTitle,
       artistName,
       fullLyrics,
       stanzas,
+      direction,
     }),
     responseSchema: SONG_OVERVIEW_FROM_STANZAS_CONTRACT as Record<
       string,
@@ -329,6 +415,7 @@ export async function analyzeSongBottomUp(
     songTitle,
     artistName,
     fullText: fullLyrics,
+    direction,
     culturalTranslation: songRaw.culturalTranslation,
     summary: songRaw.summary,
     stanzas,
@@ -340,4 +427,59 @@ export async function analyzeSongBottomUp(
   ]);
 
   return song;
+}
+
+// ---------------------------------------------------------------------------
+// Free-form Q&A about a highlighted selection
+//
+// No cache table — these questions are one-shot and vary by question text,
+// so a key derived from songId alone would be wrong, and building a stable
+// (text, question) cache key isn't justified for a hackathon-scope feature.
+// Each call hits NVIDIA directly through the shared client.
+// ---------------------------------------------------------------------------
+
+export async function askAboutSelection(
+  req: AskAboutSelectionRequest
+): Promise<{ answer: string }> {
+  const text = (req.text ?? "").trim();
+  const question = (req.question ?? "").trim();
+  if (text.length === 0) {
+    throw new AnalysisError("askAboutSelection: selection text is empty.");
+  }
+  if (question.length === 0) {
+    throw new AnalysisError("askAboutSelection: question is empty.");
+  }
+
+  const prompt = buildAskAboutSelectionPrompt(req);
+  const raw = await callNvidiaStructured<AskAboutSelectionResponse>({
+    prompt,
+    responseSchema: ASK_ABOUT_SELECTION_CONTRACT as Record<string, unknown>,
+  });
+  return parseAskAnswer(raw);
+}
+
+// ---------------------------------------------------------------------------
+// Word detail — on-demand deeper analysis for a single word
+//
+// Hit explicitly by the user via the lyric UI's "fetch conjugations &
+// examples" button. No cache table in this domain — the lyric page keeps
+// a session-local map keyed by (direction, surface) so repeated opens
+// within a session reuse the response, and a real user wanting to
+// re-analyze can dismiss the card and reopen. Keeps the Dexie surface
+// smaller.
+// ---------------------------------------------------------------------------
+
+export async function analyzeWordDetail(
+  req: WordDetailRequest
+): Promise<WordDetail> {
+  const surface = (req.surface ?? "").trim();
+  if (surface.length === 0) {
+    throw new AnalysisError("analyzeWordDetail: surface is empty.");
+  }
+  const prompt = buildWordDetailPrompt(req);
+  const raw = await callNvidiaStructured<WordDetailResponse>({
+    prompt,
+    responseSchema: WORD_DETAIL_CONTRACT as Record<string, unknown>,
+  });
+  return parseWordDetail(raw, surface);
 }

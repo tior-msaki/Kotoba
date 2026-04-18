@@ -113,12 +113,20 @@ export async function exportLine(
     entries: [],
   };
 
+  // Prefer the direction the analysis was produced with, unless the caller
+  // explicitly passed one. AnalysisLine.direction is always set by the
+  // parser after the direction-fix.
+  const effectiveContext: ExportContext = {
+    ...context,
+    direction: context.direction ?? line.direction,
+  };
+
   for (const word of line.words) {
     const outcome = await exportWord(
       word,
       line.japanese,
       line.culturalTranslation,
-      context
+      effectiveContext
     );
 
     if (outcome.entry) {
@@ -144,7 +152,8 @@ export async function exportSong(
     songTitle: analysis.songTitle,
     artistName: analysis.artistName,
     sourceTrackId: context?.sourceTrackId,
-    direction: context?.direction,
+    // Prefer the analysis's own direction if the caller didn't pass one.
+    direction: context?.direction ?? analysis.direction,
   };
 
   const totals: ExportResult = {
