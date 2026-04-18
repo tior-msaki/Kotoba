@@ -1056,9 +1056,12 @@ body.page-ready { opacity: 1; }
   async function translateAllLines() {
     if (!translateAllBtn) return;
     if (!state.lyrics || !callbacks.analyzeLine) return;
+    if (state.busy) return;
+    state.busy = true;
     translateAllBtn.disabled = true;
     var originalLabel = translateAllBtn.textContent;
     translateAllBtn.textContent = 'translating…';
+    try {
     var stanzas = state.lyrics.stanzas;
     var total = 0;
     for (var s0 = 0; s0 < stanzas.length; s0++) total += stanzas[s0].length;
@@ -1087,8 +1090,6 @@ body.page-ready { opacity: 1; }
         renderLyrics();
       }
     }
-    translateAllBtn.disabled = false;
-    translateAllBtn.textContent = originalLabel;
     // Land the user on the 'all' view so they see the concatenated
     // translated output in renderSongOverview.
     state.activeLineRef = null;
@@ -1099,6 +1100,11 @@ body.page-ready { opacity: 1; }
       if (songStatusEl) {
         songStatusEl.textContent = 'translated ' + (total - failed) + ' of ' + total + ' lines · ' + failed + ' failed';
       }
+    }
+    } finally {
+      state.busy = false;
+      translateAllBtn.disabled = false;
+      translateAllBtn.textContent = originalLabel;
     }
   }
 
@@ -1463,6 +1469,9 @@ body.page-ready { opacity: 1; }
 
   // ─── Line analysis orchestration ───────────────────────────────────
   async function selectLine(si, li) {
+    if (state.busy) {
+      return;
+    }
     state.activeLineRef = { stanzaIndex: si, lineIndex: li };
     state.activeStanzaIndex = si;
     state.selectionAnalysis = null;

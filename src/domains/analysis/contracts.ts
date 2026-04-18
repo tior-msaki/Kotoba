@@ -2,7 +2,7 @@
  * JSON schema contracts for the LLM's structured output.
  *
  * These objects describe the exact JSON shape we want the analysis model
- * to return. The NVIDIA client (src/lib/nvidia.ts) stringifies the schema
+ * to return. The LLM client (src/lib/llm.ts) forwards the schema
  * and embeds it into the user message, then forces JSON-only output via
  * `response_format: { type: "json_object" }`. (Previously these were
  * passed as `response_schema` to Gemini; the schemas themselves are still

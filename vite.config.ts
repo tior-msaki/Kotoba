@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { ytmusicSearchMiddleware } from "./src/server/ytmusic-middleware";
 import { nvidiaProxyMiddleware } from "./src/server/nvidia-middleware";
+import { azureOpenAiProxyMiddleware } from "./src/server/azure-openai-middleware";
 
 /**
  * YouTube Music search is served by a Node-side middleware mounted here
@@ -39,6 +40,20 @@ const nvidiaProxyPlugin = () => ({
   },
 });
 
+/**
+ * Azure OpenAI (e.g. ZotGPT) — same JSON contract as NVIDIA; browser uses
+ * `/api/azure/chat` when `VITE_LLM_PROVIDER=azure`.
+ */
+const azureOpenAiProxyPlugin = () => ({
+  name: "kotoba-azure-openai-proxy",
+  configureServer(server: { middlewares: { use: (fn: unknown) => void } }) {
+    server.middlewares.use(azureOpenAiProxyMiddleware());
+  },
+  configurePreviewServer(server: { middlewares: { use: (fn: unknown) => void } }) {
+    server.middlewares.use(azureOpenAiProxyMiddleware());
+  },
+});
+
 export default defineConfig(({ mode }) => {
   // Vite's `envPrefix` only controls which variables get injected into
   // the client's `import.meta.env`. Server-side middleware runs in Node
@@ -55,7 +70,12 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [react(), ytmusicProxyPlugin(), nvidiaProxyPlugin()],
+    plugins: [
+      react(),
+      ytmusicProxyPlugin(),
+      nvidiaProxyPlugin(),
+      azureOpenAiProxyPlugin(),
+    ],
     // NVIDIA_ is intentionally NOT in envPrefix: the key lives server-side
     // (read by nvidia-middleware.ts from process.env) and must never ship
     // in client JS. SPOTIFY_CLIENT_SECRET is the existing local-prototype

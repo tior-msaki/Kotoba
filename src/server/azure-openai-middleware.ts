@@ -1,44 +1,21 @@
 /**
- * NVIDIA API proxy middleware for the Vite dev / preview server.
+ * Azure OpenAI–compatible chat proxy (e.g. UCI ZotGPT).
  *
- * WHY THIS EXISTS
- * ---------------
- * NVIDIA's `https://integrate.api.nvidia.com` endpoint does not set
- * permissive CORS headers, so the browser cannot call it directly — every
- * fetch from client JS fails with the generic "Failed to fetch" TypeError
- * before any response is received. In addition, calling NVIDIA from the
- * browser would require the API key to be bundled into client JS, which is
- * a leak.
+ * Same browser contract as nvidia-middleware:
+ *   POST /api/azure/chat   body: { prompt, responseSchema, model?, maxCompletionTokens? }
  *
- * This middleware gives the browser a same-origin endpoint to hit:
+ * Upstream URL pattern:
+ *   {AZURE_OPENAI_ENDPOINT}/deployments/{deployment}/chat/completions?api-version=...
  *
- *   POST /api/nvidia/chat    body: { prompt, responseSchema, model?, maxCompletionTokens? }
- *
- * The server reads `NVIDIA_API_KEY` (and optional `NVIDIA_MODEL`) from
- * `process.env`, builds the OpenAI-compatible chat-completions body (the
- * schema is embedded into the user message and `response_format:
- * {type:"json_object"}` forces JSON-only output), forwards to NVIDIA with
- * Bearer auth, and returns the raw OpenAI envelope on success. Every
- * failure path returns a structured `{ error, code }` JSON body with the
- * matching HTTP status, so the client can surface actionable messages
- * instead of a bare "Failed to fetch".
- *
- * INTEGRATION
- * -----------
- * `vite.config.ts` wires this as a `configureServer` + `configurePreview`
- * plugin hook. The middleware is only active while `vite dev` or `vite
- * preview` is running. A production deployment without a Node server
- * would need an equivalent endpoint hosted elsewhere (same contract).
+ * Auth: standard Azure OpenAI `api-key` header (override via
+ * AZURE_OPENAI_AUTH_HEADER if your gateway expects Bearer).
  */
 
 import type { Connect } from "vite";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { buildStructuredUserContent } from "./openai-proxy-shared";
 
-const NVIDIA_CHAT_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
-const DEFAULT_MODEL = "meta/llama-3.1-70b-instruct";
-
-interface NvidiaChatRequest {
+interface AzureChatRequest {
   prompt?: unknown;
   responseSchema?: unknown;
   model?: unknown;
@@ -49,10 +26,6 @@ interface StructuredError {
   error: string;
   code: string;
 }
-
-// ---------------------------------------------------------------------------
-// HTTP helpers
-// ---------------------------------------------------------------------------
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status;
@@ -70,7 +43,7 @@ function sendError(
   sendJson(res, status, { error, code } satisfies StructuredError);
 }
 
-function pickMaxTokens(payload: NvidiaChatRequest): number | undefined {
+function pickMaxTokens(payload: AzureChatRequest): number | undefined {
   const v = payload.maxCompletionTokens;
   if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) return undefined;
   return Math.min(Math.floor(v), 128000);
@@ -88,9 +61,44 @@ async function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Handler
-// ---------------------------------------------------------------------------
+function resolveUpstreamUrl(): string | null {
+  const base =
+    typeof process.env.AZURE_OPENAI_ENDPOINT === "string"
+      ? process.env.AZURE_OPENAI_ENDPOINT.trim().replace(/\/$/, "")
+      : "";
+  const deployment =
+    typeof process.env.AZURE_OPENAI_DEPLOYMENT === "string"
+      ? process.env.AZURE_OPENAI_DEPLOYMENT.trim()
+      : "";
+  const apiVersion =
+    typeof process.env.AZURE_OPENAI_API_VERSION === "string" &&
+    process.env.AZURE_OPENAI_API_VERSION.trim().length > 0
+      ? process.env.AZURE_OPENAI_API_VERSION.trim()
+      : "2024-06-01";
+
+  if (base.length === 0 || deployment.length === 0) return null;
+
+  const q = new URLSearchParams({ "api-version": apiVersion });
+  return `${base}/deployments/${encodeURIComponent(deployment)}/chat/completions?${q.toString()}`;
+}
+
+function resolveAuthHeaders(): Record<string, string> | null {
+  const key =
+    typeof process.env.AZURE_OPENAI_API_KEY === "string"
+      ? process.env.AZURE_OPENAI_API_KEY.trim()
+      : "";
+  if (key.length === 0) return null;
+
+  const mode =
+    typeof process.env.AZURE_OPENAI_AUTH_MODE === "string"
+      ? process.env.AZURE_OPENAI_AUTH_MODE.trim().toLowerCase()
+      : "api-key";
+
+  if (mode === "bearer") {
+    return { Authorization: `Bearer ${key}` };
+  }
+  return { "api-key": key };
+}
 
 async function handleChat(
   req: IncomingMessage,
@@ -100,27 +108,26 @@ async function handleChat(
     return sendError(
       res,
       405,
-      "Only POST is allowed on /api/nvidia/chat",
+      "Only POST is allowed on /api/azure/chat",
       "METHOD_NOT_ALLOWED"
     );
   }
 
-  const apiKey = process.env.NVIDIA_API_KEY;
-  if (typeof apiKey !== "string" || apiKey.trim().length === 0) {
+  const upstreamUrl = resolveUpstreamUrl();
+  const authHeaders = resolveAuthHeaders();
+
+  if (!upstreamUrl || !authHeaders) {
     return sendError(
       res,
       500,
-      "NVIDIA_API_KEY is not set on the server. Add it to .env at the " +
-        "repository root and restart the Vite server (npm run dev).",
-      "MISSING_API_KEY"
+      "Azure OpenAI is not configured. Set AZURE_OPENAI_ENDPOINT " +
+        "(e.g. https://azureapi.zotgpt.uci.edu/openai), AZURE_OPENAI_DEPLOYMENT, " +
+        "and AZURE_OPENAI_API_KEY in .env, then restart Vite.",
+      "MISSING_AZURE_CONFIG"
     );
   }
-  const defaultModel =
-    (typeof process.env.NVIDIA_MODEL === "string" &&
-      process.env.NVIDIA_MODEL.trim()) ||
-    DEFAULT_MODEL;
 
-  let payload: NvidiaChatRequest;
+  let payload: AzureChatRequest;
   try {
     const raw = await readBody(req);
     if (raw.length === 0) {
@@ -131,7 +138,7 @@ async function handleChat(
         "EMPTY_BODY"
       );
     }
-    payload = JSON.parse(raw) as NvidiaChatRequest;
+    payload = JSON.parse(raw) as AzureChatRequest;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return sendError(res, 400, `Invalid JSON body: ${msg}`, "INVALID_BODY");
@@ -160,18 +167,13 @@ async function handleChat(
     );
   }
 
-  const model =
-    typeof payload.model === "string" && payload.model.trim().length > 0
-      ? payload.model.trim()
-      : defaultModel;
-
   const maxTokens = pickMaxTokens(payload);
 
+  // Deployment selects the model; optional body.model ignored for Azure.
   const body: Record<string, unknown> = {
-    model,
     messages: [
       {
-        role: "user",
+        role: "user" as const,
         content: buildStructuredUserContent(prompt, payload.responseSchema),
       },
     ],
@@ -184,12 +186,12 @@ async function handleChat(
 
   let upstream: Response;
   try {
-    upstream = await fetch(NVIDIA_CHAT_URL, {
+    upstream = await fetch(upstreamUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
         Accept: "application/json",
+        ...authHeaders,
       },
       body: JSON.stringify(body),
     });
@@ -198,7 +200,7 @@ async function handleChat(
     return sendError(
       res,
       502,
-      `Could not reach NVIDIA API: ${msg}`,
+      `Could not reach Azure OpenAI: ${msg}`,
       "UPSTREAM_UNREACHABLE"
     );
   }
@@ -215,7 +217,7 @@ async function handleChat(
     return sendError(
       res,
       upstream.status,
-      `NVIDIA API error ${upstream.status}: ${trimmed}`,
+      `Azure OpenAI error ${upstream.status}: ${trimmed}`,
       code
     );
   }
@@ -227,29 +229,23 @@ async function handleChat(
     return sendError(
       res,
       502,
-      "NVIDIA API returned a non-JSON response",
+      "Azure OpenAI returned a non-JSON response",
       "UPSTREAM_INVALID_JSON"
     );
   }
 
-  // Pass through the OpenAI-shape envelope as-is — the client reads
-  // choices[0].message.content and parses it as JSON.
   sendJson(res, 200, envelope);
 }
 
-// ---------------------------------------------------------------------------
-// Middleware dispatcher
-// ---------------------------------------------------------------------------
-
-export function nvidiaProxyMiddleware(): Connect.NextHandleFunction {
+export function azureOpenAiProxyMiddleware(): Connect.NextHandleFunction {
   return (req, res, next) => {
     if (!req.url) return next();
-    if (!req.url.startsWith("/api/nvidia/")) return next();
+    if (!req.url.startsWith("/api/azure/")) return next();
     const path = req.url.split("?")[0] ?? "";
-    if (path === "/api/nvidia/chat") {
+    if (path === "/api/azure/chat") {
       void handleChat(req, res);
       return;
     }
-    sendError(res, 404, `Unknown NVIDIA endpoint: ${path}`, "UNKNOWN_ENDPOINT");
+    sendError(res, 404, `Unknown Azure endpoint: ${path}`, "UNKNOWN_ENDPOINT");
   };
 }

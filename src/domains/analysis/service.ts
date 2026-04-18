@@ -1,7 +1,7 @@
 /**
  * Analysis service — public API for the analysis domain.
  *
- * Orchestrates: check cache → build prompt → call NVIDIA → parse → cache → return.
+ * Orchestrates: check cache → build prompt → call LLM (NVIDIA or Azure) → parse → cache → return.
  * Three entry points: analyzeLine, analyzeStanza, analyzeSong.
  */
 
@@ -61,7 +61,16 @@ import {
   cacheSongAnalysis,
   cacheSongStanzas,
 } from "./cache";
-import { callNvidiaStructured } from "../../lib/nvidia";
+import { callLlmStructured } from "../../lib/llm";
+import {
+  LLM_MAX_ASK_SELECTION,
+  LLM_MAX_LINE,
+  LLM_MAX_SONG,
+  LLM_MAX_SONG_OVERVIEW_FROM_STANZAS,
+  LLM_MAX_STANZA,
+  LLM_MAX_STANZA_OVERVIEW_FROM_LINES,
+  LLM_MAX_WORD_DETAIL,
+} from "./llm-limits";
 import { mapWithConcurrency } from "../../lib/concurrency";
 import { splitPastedLyricsIntoStanzas } from "./lyricsSplit";
 import { AnalysisError } from "../../lib/errors";
@@ -82,7 +91,7 @@ export interface AnalysisOptions {
    */
   skipCache?: boolean;
   /**
-   * Max parallel NVIDIA requests for bottom-up line batches.
+   * Max parallel LLM requests for bottom-up line batches.
    * Lower this if you hit rate limits. Default: 4.
    */
   maxConcurrentLlm?: number;
@@ -130,9 +139,10 @@ export async function analyzeLine(
   }
 
   const prompt = buildLinePrompt(req);
-  const raw = await callNvidiaStructured<LineAnalysisResponse>({
+  const raw = await callLlmStructured<LineAnalysisResponse>({
     prompt,
     responseSchema: LINE_ANALYSIS_CONTRACT as Record<string, unknown>,
+    maxCompletionTokens: LLM_MAX_LINE,
   });
 
   // Pass req.lineNumber AND req.line as authoritative overrides:
@@ -179,9 +189,10 @@ export async function analyzeStanza(
   }
 
   const prompt = buildStanzaPrompt(req);
-  const raw = await callNvidiaStructured<StanzaAnalysisResponse>({
+  const raw = await callLlmStructured<StanzaAnalysisResponse>({
     prompt,
     responseSchema: STANZA_ANALYSIS_CONTRACT as Record<string, unknown>,
+    maxCompletionTokens: LLM_MAX_STANZA,
   });
 
   // req.stanza is the authoritative source text — see analyzeLine.
@@ -215,9 +226,10 @@ export async function analyzeSong(
   }
 
   const prompt = buildSongPrompt(req);
-  const raw = await callNvidiaStructured<SongAnalysisResponse>({
+  const raw = await callLlmStructured<SongAnalysisResponse>({
     prompt,
     responseSchema: SONG_ANALYSIS_CONTRACT as Record<string, unknown>,
+    maxCompletionTokens: LLM_MAX_SONG,
   });
 
   // Derive per-stanza source text from the user's full lyrics so each
@@ -248,7 +260,7 @@ async function finalizeStanzaFromAnalyzedLines(
   lineResults: AnalysisLine[],
   direction: AnalysisDirection
 ): Promise<AnalysisStanza> {
-  const raw = await callNvidiaStructured<StanzaOverviewFromLinesResponse>({
+  const raw = await callLlmStructured<StanzaOverviewFromLinesResponse>({
     prompt: buildStanzaOverviewFromLinesPrompt({
       songTitle,
       artistName,
@@ -261,6 +273,7 @@ async function finalizeStanzaFromAnalyzedLines(
       string,
       unknown
     >,
+    maxCompletionTokens: LLM_MAX_STANZA_OVERVIEW_FROM_LINES,
   });
 
   return {
@@ -276,7 +289,7 @@ async function finalizeStanzaFromAnalyzedLines(
 
 /**
  * Analyze each line in a stanza individually (bounded parallelism), then
- * one stanza-level NVIDIA pass for direct/cultural translation and summary.
+ * one stanza-level LLM pass for direct/cultural translation and summary.
  */
 export async function analyzeStanzaByLines(
   lines: string[],
@@ -332,7 +345,7 @@ export interface AnalyzeSongBottomUpParams {
 }
 
 /**
- * Bottom-up song analysis: lines (parallel NVIDIA calls) → stanza overview per stanza →
+ * Bottom-up song analysis: lines (parallel LLM calls) → stanza overview per stanza →
  * song-level overview. Caches lines, stanzas, and the full song like {@link analyzeSong}.
  */
 export async function analyzeSongBottomUp(
@@ -397,7 +410,7 @@ export async function analyzeSongBottomUp(
     stanzas.push(stanza);
   }
 
-  const songRaw = await callNvidiaStructured<SongOverviewFromStanzasResponse>({
+  const songRaw = await callLlmStructured<SongOverviewFromStanzasResponse>({
     prompt: buildSongOverviewFromStanzasPrompt({
       songTitle,
       artistName,
@@ -409,6 +422,7 @@ export async function analyzeSongBottomUp(
       string,
       unknown
     >,
+    maxCompletionTokens: LLM_MAX_SONG_OVERVIEW_FROM_STANZAS,
   });
 
   const song: SongAnalysis = {
@@ -435,7 +449,7 @@ export async function analyzeSongBottomUp(
 // No cache table — these questions are one-shot and vary by question text,
 // so a key derived from songId alone would be wrong, and building a stable
 // (text, question) cache key isn't justified for a hackathon-scope feature.
-// Each call hits NVIDIA directly through the shared client.
+// Each call hits the configured LLM proxy through the shared client.
 // ---------------------------------------------------------------------------
 
 export async function askAboutSelection(
@@ -451,9 +465,10 @@ export async function askAboutSelection(
   }
 
   const prompt = buildAskAboutSelectionPrompt(req);
-  const raw = await callNvidiaStructured<AskAboutSelectionResponse>({
+  const raw = await callLlmStructured<AskAboutSelectionResponse>({
     prompt,
     responseSchema: ASK_ABOUT_SELECTION_CONTRACT as Record<string, unknown>,
+    maxCompletionTokens: LLM_MAX_ASK_SELECTION,
   });
   return parseAskAnswer(raw);
 }
@@ -477,9 +492,10 @@ export async function analyzeWordDetail(
     throw new AnalysisError("analyzeWordDetail: surface is empty.");
   }
   const prompt = buildWordDetailPrompt(req);
-  const raw = await callNvidiaStructured<WordDetailResponse>({
+  const raw = await callLlmStructured<WordDetailResponse>({
     prompt,
     responseSchema: WORD_DETAIL_CONTRACT as Record<string, unknown>,
+    maxCompletionTokens: LLM_MAX_WORD_DETAIL,
   });
   return parseWordDetail(raw, surface);
 }
