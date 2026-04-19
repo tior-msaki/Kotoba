@@ -13,9 +13,20 @@
             background: #FFFFFF;
         }
 
+        /* When rendered inside the home overlay iframe, the scrim is provided
+           by the parent — keep our own background transparent so it shows. */
+        body.embedded,
+        body.embedded .settings-page {
+            background: transparent;
+        }
+
+        body.embedded .settings-close {
+            display: none;
+        }
+
         body {
             opacity: 0;
-            transition: opacity 0.35s ease;
+            transition: opacity 0.15s ease;
         }
 
         body.page-ready {
@@ -81,6 +92,50 @@
 
         .settings-close:hover {
             background: #d8cfc0;
+        }
+
+        .theme-row {
+            position: absolute;
+            left: calc(50% - 500px/2);
+            top: 300px;
+            width: 500px;
+            text-align: center;
+        }
+
+        .theme-label {
+            font-family: 'Forum', serif;
+            font-size: 32px;
+            line-height: 1;
+            color: #000000;
+        }
+
+        .theme-choices {
+            margin-top: 14px;
+            display: flex;
+            justify-content: center;
+            gap: 28px;
+        }
+
+        .theme-choice {
+            font-family: 'Forum', serif;
+            font-size: 26px;
+            line-height: 1;
+            text-decoration: underline;
+            color: #000000;
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            opacity: 0.5;
+        }
+
+        .theme-choice:hover {
+            opacity: 0.85;
+        }
+
+        .theme-choice.active {
+            opacity: 1;
+            font-weight: 700;
         }
 
         /* Erase-all row. Styling mirrors the Forum-font ghost buttons used
@@ -160,6 +215,13 @@
     <div class="viewport">
         <div class="settings-page">
             <div class="settings-title">settings</div>
+            <div class="theme-row">
+                <div class="theme-label">theme</div>
+                <div class="theme-choices">
+                    <button class="theme-choice" data-theme="bw" type="button">black &amp; white</button>
+                    <button class="theme-choice" data-theme="color" type="button">colored</button>
+                </div>
+            </div>
             <div class="erase-row">
                 <button class="erase-btn" id="eraseBtn" type="button">erase all data</button>
                 <div class="erase-prompt hidden" id="erasePrompt">
@@ -182,10 +244,13 @@
         window.addEventListener('resize', scaleContent);
         scaleContent();
 
+        const isEmbedded = window.parent !== window;
+        if (isEmbedded) document.body.classList.add('embedded');
+
         requestAnimationFrame(() => document.body.classList.add('page-ready'));
         function navigateTo(url) {
             document.body.classList.remove('page-ready');
-            setTimeout(() => { window.location.href = url; }, 350);
+            setTimeout(() => { window.location.href = url; }, 150);
         }
 
         document.getElementById('settingsClose').addEventListener('click', () => {
@@ -208,11 +273,39 @@
             'kotoba-burned-playlist',
             'kotoba-spotify-bearer-token',
             'kotoba-visited',
+            'kotoba-theme',
             // Last-committed carousel position (disk-select.html).
             'kotoba-current-playlist-slot',
             // Legacy inline notes store still written by home.html.
             'kotoba-notes',
         ];
+
+        // ---- Theme toggle --------------------------------------------------
+        // Persist selection in localStorage under 'kotoba-theme' and, when
+        // embedded in the home overlay iframe, notify the parent so the home
+        // page swaps element visuals live without requiring a reload.
+        const THEME_KEY = 'kotoba-theme';
+        const themeBtns = document.querySelectorAll('.theme-choice');
+
+        function renderThemeButtons() {
+            const current = localStorage.getItem(THEME_KEY) || 'bw';
+            themeBtns.forEach(b => {
+                b.classList.toggle('active', b.dataset.theme === current);
+            });
+        }
+
+        themeBtns.forEach(b => {
+            b.addEventListener('click', () => {
+                const t = b.dataset.theme;
+                localStorage.setItem(THEME_KEY, t);
+                renderThemeButtons();
+                if (window.parent !== window) {
+                    window.parent.postMessage({ kotoba: 'theme', value: t }, '*');
+                }
+            });
+        });
+
+        renderThemeButtons();
 
         // Prefix of the per (playlistSlot, cdSlot) records written by
         // src/domains/playlist/slotMemory.ts. Cleared via prefix scan

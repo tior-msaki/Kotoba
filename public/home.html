@@ -47,7 +47,7 @@
         }
 
         .bunny-cards,
-        .cds,
+        .quiz,
         .settings {
             opacity: 0;
             pointer-events: none;
@@ -55,14 +55,14 @@
         }
 
         .home-page.menu-open .bunny-cards,
-        .home-page.menu-open .cds,
+        .home-page.menu-open .quiz,
         .home-page.menu-open .settings {
             opacity: 1;
             pointer-events: auto;
         }
 
-        .home-page.menu-open .cds {
-            top: 189px;
+        .home-page.menu-open .quiz {
+            top: 178px;
         }
 
         .home-page.menu-open .settings {
@@ -152,7 +152,7 @@
         .disk,
         .cd-player,
         .bunny-cards,
-        .cds,
+        .quiz,
         .settings {
             transition: filter 0.2s ease;
         }
@@ -164,7 +164,7 @@
         .disk:hover,
         .cd-player:hover,
         .bunny-cards:hover,
-        .cds:hover,
+        .quiz:hover,
         .settings:hover {
             filter: drop-shadow(4px 6px 6px rgba(0, 0, 0, 0.35));
         }
@@ -279,13 +279,13 @@
             background-image: url("assets/home/arrow.png");
         }
 
-        .cds {
+        .quiz {
             position: absolute;
-            width: 125px;
-            height: 87px;
-            left: 1315px;
+            width: 93px;
+            height: 89px;
+            left: 1316px;
             top: 45px;
-            background-image: url("assets/home/cds.png");
+            background-image: url("assets/home/quiz.png");
             cursor: pointer;
         }
 
@@ -1072,14 +1072,14 @@
 
         .url-input {
             position: absolute;
-            width: 206px;
-            height: 45px;
+            width: 730px;
+            height: 30px;
             left: 394px;
-            top: 514px;
+            top: 523px;
             font-family: 'Gamja Flower', cursive;
             font-weight: 400;
-            font-size: 36px;
-            line-height: 45px;
+            font-size: 24px;
+            line-height: 30px;
             color: #000000;
             background: transparent;
             border: none;
@@ -1094,7 +1094,7 @@
             color: #000000;
             opacity: 1;
             font-family: 'Gamja Flower', cursive;
-            font-size: 36px;
+            font-size: 24px;
         }
 
         .laptop-stage.phase-burn .url-input {
@@ -1372,7 +1372,7 @@
         <button class="points-increment" id="pointsIncrement">increment</button>
         <button class="points-reset" id="pointsReset">reset</button>
         <div class="bunny-cards"></div>
-        <div class="cds"></div>
+        <div class="quiz"></div>
         <div class="settings"></div>
         <div class="arrow"></div>
         <div class="desktop-bubble"></div>
@@ -1737,10 +1737,6 @@
                 return;
             }
             localStorage.setItem('kotoba-visited', '1');
-            navigateTo('disk-select.html');
-        });
-
-        document.querySelector('.cds').addEventListener('click', () => {
             navigateTo('disk-select.html');
         });
 
