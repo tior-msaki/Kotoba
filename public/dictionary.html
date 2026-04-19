@@ -14,7 +14,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   padding: 16px 90px 20px;
   gap: 12px;
   font-family: 'Linux Libertine', 'Times New Roman', serif;
@@ -69,7 +69,7 @@ body {
    Narrow: row layout, tabs on left or right side
 ══════════════════════════════════════════ */
 #book-wrap {
-  max-width: min(880px, calc((100vh - 140px) * 6 / 5));
+  max-width: min(1000px, calc((100vh - 140px) * 3 / 2));
   width: 100%;
   display: flex;
   flex-direction: column;   /* tabs above book by default */
@@ -190,7 +190,7 @@ body {
   border: 1px solid #000;
   position: relative;
   z-index: 1;
-  aspect-ratio: 6 / 5;
+  aspect-ratio: 3 / 2;
 }
 
 /* ── SINGLE PAGE ── */
@@ -229,11 +229,11 @@ body {
 }
 
 .hw-range {
-  font-size: 6.5pt;
+  font-size: 13pt;
   font-weight: bold;
   font-style: italic;
 }
-.pg { font-size: 6.5pt; }
+.pg { font-size: 13pt; }
 
 /* ── Two-column grid inside a page ── */
 .cols {
@@ -252,53 +252,53 @@ body {
 
 /* ── Section kana header ── */
 .sec {
-  font-size: 6.5pt;
+  font-size: 13pt;
   font-weight: bold;
   border-bottom: 0.5px solid #000;
-  margin: 3px 0 1.5px 0;
-  line-height: 1.1;
-  padding-bottom: 0.5px;
+  margin: 6px 0 4px 0;
+  line-height: 1.15;
+  padding-bottom: 1px;
 }
 
 /* ── Entry ── */
 .e {
-  font-size: 5.7pt;
-  line-height: 1.3;
-  margin-bottom: 1.5px;
-  text-indent: -7px;
-  padding-left: 7px;
+  font-size: 12pt;
+  line-height: 1.35;
+  margin-bottom: 4px;
+  text-indent: -12px;
+  padding-left: 12px;
 }
 
 .hw {
   font-weight: bold;
-  font-size: 6.2pt;
+  font-size: 13pt;
   font-family: 'Noto Serif JP', 'Times New Roman', serif;
 }
 
 ruby { font-family: 'Noto Serif JP', 'Times New Roman', serif; }
 rt {
-  font-size: 3.8pt;
+  font-size: 8.5pt;
   font-weight: 400;
   letter-spacing: 0;
   line-height: 1.1;
 }
 
-.rom { font-style: italic; font-weight: normal; font-size: 5.5pt; }
-.pos { font-style: italic; font-size: 5.2pt; }
-.df  { font-size: 5.7pt; }
-.xr  { font-style: italic; font-size: 5.2pt; }
-.sn  { font-weight: bold; font-size: 5.2pt; }
+.rom { font-style: italic; font-weight: normal; font-size: 11.5pt; }
+.pos { font-style: italic; font-size: 11pt; }
+.df  { font-size: 12pt; }
+.xr  { font-style: italic; font-size: 11pt; }
+.sn  { font-weight: bold; font-size: 11pt; }
 
 .note {
   border: 0.5px solid #000;
-  padding: 2px 2.5px;
-  margin: 2px 0;
-  font-size: 5.1pt;
-  line-height: 1.3;
+  padding: 4px 5px;
+  margin: 5px 0;
+  font-size: 11pt;
+  line-height: 1.35;
 }
 .note-lbl {
   font-weight: bold;
-  font-size: 4.9pt;
+  font-size: 10pt;
   letter-spacing: 0.05em;
 }
 

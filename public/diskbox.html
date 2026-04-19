@@ -15,7 +15,7 @@
 
         body {
             opacity: 0;
-            transition: opacity 0.35s ease;
+            transition: opacity 0.15s ease;
         }
 
         body.page-ready {
@@ -114,7 +114,7 @@
         requestAnimationFrame(() => document.body.classList.add('page-ready'));
         function navigateTo(url) {
             document.body.classList.remove('page-ready');
-            setTimeout(() => { window.location.href = url; }, 350);
+            setTimeout(() => { window.location.href = url; }, 150);
         }
 
         document.querySelector('.pick-disk').addEventListener('click', () => {

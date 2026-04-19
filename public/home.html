@@ -15,7 +15,7 @@
 
         body {
             opacity: 0;
-            transition: opacity 0.35s ease;
+            transition: opacity 0.15s ease;
         }
 
         body.page-ready {
@@ -415,6 +415,63 @@
             cursor: pointer;
         }
 
+        /* Colored theme overrides — swaps the 7 main home-page elements to
+           their colored variants. Positions and sizes come from the spec the
+           user supplied. Everything else (settings/arrow/bubbles/points/cds)
+           stays on the existing black-and-white assets. */
+        .home-page.theme-color .desktop {
+            width: 1448.66px;
+            height: 1159px;
+            left: 0px;
+            top: 41px;
+            background-image: url("assets/home/colored%20home%20page/desktop.png");
+        }
+        .home-page.theme-color .laptop {
+            width: 557px;
+            height: 724px;
+            left: 185px;
+            top: 227px;
+            background-image: url("assets/home/colored%20home%20page/laptop.png");
+        }
+        .home-page.theme-color .notes {
+            width: 230px;
+            height: 204px;
+            left: 686px;
+            top: 434px;
+            background-image: url("assets/home/colored%20home%20page/notes.png");
+        }
+        .home-page.theme-color .photocards {
+            width: 349px;
+            height: 411px;
+            left: 1015px;
+            top: 586px;
+            background-image: url("assets/home/colored%20home%20page/photocards.png");
+        }
+        .home-page.theme-color .dictionary {
+            width: 350px;
+            height: 388px;
+            left: 715px;
+            top: 609px;
+            background-image: url("assets/home/colored%20home%20page/dictionary.png");
+        }
+        .home-page.theme-color .case {
+            width: 267px;
+            height: 247px;
+            left: 883px;
+            top: 408px;
+            background-image: url("assets/home/colored%20home%20page/case.png");
+        }
+        .home-page.theme-color .cd-player {
+            width: 287px;
+            height: 270px;
+            left: 0px;
+            top: 681px;
+            background-image: url("assets/home/colored%20home%20page/cd%20player.png");
+        }
+        .home-page.theme-color .disk {
+            left: 878px;
+        }
+
         .cd-entered {
             position: absolute;
             width: 285px;
@@ -715,6 +772,60 @@
             background: #d8cfc0;
         }
 
+        .settings-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+
+        .settings-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .settings-window {
+            position: relative;
+            width: 700px;
+            height: 450px;
+            background: #fdf8ec;
+            border-radius: 14px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+            overflow: hidden;
+        }
+
+        .settings-overlay iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: transparent;
+            display: block;
+        }
+
+        .settings-close {
+            position: absolute;
+            top: 14px;
+            right: 16px;
+            width: 36px;
+            height: 35px;
+            background: url("assets/home/gacha/exit%20button.png") no-repeat center/contain;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            z-index: 5;
+            transition: transform 0.15s ease;
+        }
+
+        .settings-close:hover {
+            transform: scale(1.08);
+        }
+
         .notes-overlay {
             position: fixed;
             inset: 0;
@@ -871,6 +982,10 @@
             line-height: 1.55;
             color: #2a2418;
             padding-top: 8px;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            -webkit-hyphens: auto;
+            hyphens: auto;
         }
         .notes-content:disabled,
         .note-title-input:disabled,
@@ -1316,6 +1431,13 @@
         <iframe id="dictionaryFrame" title="Dictionary"></iframe>
     </div>
 
+    <div class="settings-overlay" id="settingsOverlay">
+        <div class="settings-window">
+            <button class="settings-close" id="settingsClose" aria-label="Close settings"></button>
+            <iframe id="settingsFrame" title="Settings"></iframe>
+        </div>
+    </div>
+
     <div class="notes-overlay" id="notesOverlay">
         <div class="notes-window">
             <button class="notes-close" id="notesClose" aria-label="Close notes"></button>
@@ -1332,7 +1454,7 @@
                 </div>
                 <input class="note-title-input" id="notesTitle" placeholder="Title" spellcheck="false" />
                 <input class="note-subtitle-input" id="notesSubtitle" placeholder="Subtitle" spellcheck="false" />
-                <textarea class="notes-content" id="notesContent" placeholder="Start writing..." spellcheck="false"></textarea>
+                <textarea class="notes-content" id="notesContent" placeholder="Start writing..." spellcheck="false" lang="en"></textarea>
             </main>
         </div>
     </div>
@@ -1374,7 +1496,7 @@
         requestAnimationFrame(() => document.body.classList.add('page-ready'));
         function navigateTo(url) {
             document.body.classList.remove('page-ready');
-            setTimeout(() => { window.location.href = url; }, 350);
+            setTimeout(() => { window.location.href = url; }, 150);
         }
 
         const albumOverlay = document.getElementById('albumOverlay');
@@ -1503,10 +1625,30 @@
         const diskEl = document.querySelector('.disk');
         const DISK_BASE = { left: 872, top: 409, width: 273, height: 240 };
         const CD_BOUNDS = { left: 0, top: 673, width: 306, height: 305 };
-        const DISK_INSERT_TX =
+        let DISK_INSERT_TX =
             (CD_BOUNDS.left + CD_BOUNDS.width / 2) - (DISK_BASE.left + DISK_BASE.width / 2);
-        const DISK_INSERT_TY =
+        let DISK_INSERT_TY =
             (CD_BOUNDS.top + CD_BOUNDS.height / 2) - (DISK_BASE.top + DISK_BASE.height / 2);
+
+        // Theme is defined per-theme in CSS but the disk's resting left also
+        // shifts with it (878 vs 872), so we mirror that value into DISK_BASE
+        // and recompute the snap offset on every theme change.
+        const THEME_KEY = 'kotoba-theme';
+        const DISK_LEFT_BY_THEME = { bw: 872, color: 878 };
+        function applyTheme(t) {
+            homePage.classList.toggle('theme-color', t === 'color');
+            DISK_BASE.left = DISK_LEFT_BY_THEME[t] ?? DISK_LEFT_BY_THEME.bw;
+            DISK_INSERT_TX =
+                (CD_BOUNDS.left + CD_BOUNDS.width / 2) - (DISK_BASE.left + DISK_BASE.width / 2);
+            DISK_INSERT_TY =
+                (CD_BOUNDS.top + CD_BOUNDS.height / 2) - (DISK_BASE.top + DISK_BASE.height / 2);
+        }
+        applyTheme(localStorage.getItem(THEME_KEY) || 'bw');
+        window.addEventListener('message', (e) => {
+            if (e.data && e.data.kotoba === 'theme') {
+                applyTheme(e.data.value);
+            }
+        });
         let diskDragging = false;
         let diskMoved = false;
         let diskInserted = false;
@@ -1602,8 +1744,17 @@
             navigateTo('disk-select.html');
         });
 
-        document.querySelector('.settings').addEventListener('click', () => {
-            navigateTo('settings.html');
+        const settingsOverlay = document.getElementById('settingsOverlay');
+        const settingsFrame = document.getElementById('settingsFrame');
+        document.querySelector('.settings').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!settingsFrame.getAttribute('src')) {
+                settingsFrame.setAttribute('src', 'settings.html');
+            }
+            settingsOverlay.classList.add('open');
+        });
+        document.getElementById('settingsClose').addEventListener('click', () => {
+            settingsOverlay.classList.remove('open');
         });
 
         function ejectDisk() {
