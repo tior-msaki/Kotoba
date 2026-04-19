@@ -166,6 +166,68 @@
             catch (e) { /* private mode / quota — autosave silently falls back to 'default' */ }
         }
 
+        // ── Slot-name lookup ────────────────────────────────────────────
+        // The React bridge's finishBurn() already persists each burned
+        // playlist under a per-slot record keyed by
+        //   kotoba-slot-v1:<encoded playlistSlotId>/<encoded cdSlotId>
+        // carrying { source: { provider, playlistId, playlistName, tracks } }.
+        // (See src/domains/playlist/slotMemory.ts for the canonical shape.)
+        // Here we mirror the same prefix + parsing so the carousel label
+        // shows the real playlist name instead of the generic "Playlist N"
+        // when a slot has a saved burned playlist. The filter matches the
+        // predicate used by hydrateBurnedCdFromSlot() so the carousel's
+        // label always agrees with what the home page will actually show.
+        const SLOT_KEY_PREFIX = 'kotoba-slot-v1:';
+        function readPlaylistNameForIndex(i) {
+            var wanted = String(i);
+            var bestAt = -1;
+            var bestName = null;
+            try {
+                for (var k = 0; k < localStorage.length; k++) {
+                    var key = localStorage.key(k);
+                    if (typeof key !== 'string' || key.indexOf(SLOT_KEY_PREFIX) !== 0) continue;
+                    var body = key.slice(SLOT_KEY_PREFIX.length);
+                    var slash = body.indexOf('/');
+                    if (slash <= 0 || slash === body.length - 1) continue;
+                    var pid;
+                    try { pid = decodeURIComponent(body.slice(0, slash)); }
+                    catch (e) { continue; }
+                    if (pid !== wanted) continue;
+                    var raw = localStorage.getItem(key);
+                    if (!raw) continue;
+                    var parsed;
+                    try { parsed = JSON.parse(raw); }
+                    catch (e) { continue; }
+                    if (!parsed || typeof parsed !== 'object') continue;
+                    // Match slotMemory's own version guard — a future v2
+                    // record with a different shape must not be read by
+                    // v1-only code here.
+                    if (parsed.version !== 1) continue;
+                    var src = parsed.source;
+                    if (!src || typeof src !== 'object') continue;
+                    // Only consider real burned sources — matches
+                    // hydrateBurnedCdFromSlot's predicate so the carousel
+                    // never shows a label for a slot home.html would
+                    // decline to restore. Every condition below mirrors
+                    // that predicate exactly (provider, playlistId,
+                    // playlistName, non-empty tracks).
+                    if (src.provider !== 'spotify' && src.provider !== 'youtube') continue;
+                    if (typeof src.playlistId !== 'string' || src.playlistId.length === 0) continue;
+                    if (typeof src.playlistName !== 'string' || src.playlistName.length === 0) continue;
+                    if (!Array.isArray(src.tracks) || src.tracks.length === 0) continue;
+                    var savedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : 0;
+                    if (savedAt > bestAt) {
+                        bestAt = savedAt;
+                        bestName = src.playlistName;
+                    }
+                }
+            } catch (e) {
+                // private mode / quota — fall back to the generic label.
+                return null;
+            }
+            return bestName;
+        }
+
         const cdEls = playlists.map((pl, i) => {
             const el = document.createElement('div');
             el.className = 'cd';
@@ -213,7 +275,13 @@
                 }
                 prevOffsets.set(i, offset);
             });
-            titleEl.textContent = playlists[currentIndex].name;
+            // Prefer the real saved playlist name for this carousel slot;
+            // fall back to the generic "Playlist N" label when no burned
+            // playlist has been assigned to this slot yet.
+            var saved = readPlaylistNameForIndex(currentIndex);
+            titleEl.textContent = (typeof saved === 'string' && saved.length > 0)
+                ? saved
+                : playlists[currentIndex].name;
         }
 
         function next() {
