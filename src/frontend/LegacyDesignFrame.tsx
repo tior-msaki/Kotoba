@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { cd, dictionary, notes, rewards, search, setup } from "../services/app";
+import { cd, dictionary, notes, popupQuiz, rewards, search, setup } from "../services/app";
 import type {
   AnalysisDirection,
   AnalysisLine,
@@ -495,6 +495,13 @@ export function LegacyDesignFrame() {
       const searchClose = doc.getElementById(
         "searchClose"
       ) as HTMLElement | null;
+      const quizIcon = doc.querySelector(".quiz") as HTMLElement | null;
+      const quizOverlayEl = doc.getElementById(
+        "quizOverlay"
+      ) as HTMLElement | null;
+      const quizFrame = doc.getElementById(
+        "quizFrame"
+      ) as HTMLIFrameElement | null;
       const playlistIntro = doc.querySelector(
         ".playlist-intro"
       ) as HTMLElement | null;
@@ -1570,6 +1577,69 @@ export function LegacyDesignFrame() {
       };
       // ------------------------------------------------------------------
 
+      // --- Quiz bridge -------------------------------------------------
+      // home.html owns the overlay open/close; this bridge just installs
+      // the popupQuiz facade into the nested iframe once it's loaded.
+      // Mirrors the dictionary / lyric / search bridges; no new pattern.
+      interface QuizBridgeApi {
+        setApi: (api: {
+          getState: typeof popupQuiz.getState;
+          getNext: typeof popupQuiz.getNext;
+          submit: typeof popupQuiz.submit;
+          prefetchNext: typeof popupQuiz.prefetchNext;
+          recentHistory: typeof popupQuiz.recentHistory;
+        }) => void;
+        open: () => void;
+        close: () => void;
+      }
+
+      const getQuizApi = (): QuizBridgeApi | undefined => {
+        if (!quizFrame) return undefined;
+        const win = quizFrame.contentWindow as
+          | (Window & { __kotobaQuiz?: QuizBridgeApi })
+          | null;
+        return win?.__kotobaQuiz;
+      };
+
+      const pushQuizApi = (): void => {
+        const api = getQuizApi();
+        if (!api) return;
+        api.setApi({
+          getState: popupQuiz.getState,
+          getNext: popupQuiz.getNext,
+          submit: popupQuiz.submit,
+          prefetchNext: popupQuiz.prefetchNext,
+          recentHistory: popupQuiz.recentHistory,
+        });
+        api.open();
+      };
+
+      const onQuizOpen = (): void => {
+        if (!quizFrame) return;
+        // home.html's click handler sets `src` on first open. From here
+        // either the api is already present (re-open) or it'll be after
+        // the iframe finishes loading.
+        if (getQuizApi()) {
+          pushQuizApi();
+          return;
+        }
+        quizFrame.addEventListener(
+          "load",
+          () => {
+            pushQuizApi();
+          },
+          { once: true }
+        );
+      };
+
+      const onQuizCloseSignal = (): void => {
+        // Parent's own handlers still remove the `.open` class — this
+        // just lets the iframe reset its in-memory state so a later
+        // re-open starts clean.
+        getQuizApi()?.close();
+      };
+      // ------------------------------------------------------------------
+
       applyCdStateToDesign();
 
       incrementBtn?.addEventListener("click", onIncrement, true);
@@ -1586,6 +1656,17 @@ export function LegacyDesignFrame() {
       lyricOverlay?.addEventListener("mousedown", onLyricOverlayMousedown);
       searchClose?.addEventListener("click", onSearchCloseClick);
       searchOverlay?.addEventListener("mousedown", onSearchOverlayMousedown);
+      // Quiz click uses bubble phase so home.html's own click handler
+      // (which sets iframe src + toggles `.open`) runs first.
+      quizIcon?.addEventListener("click", onQuizOpen);
+      // Listening for parent-side close signals so the iframe's in-memory
+      // state resets cleanly. home.html still owns removing the `.open`
+      // class — these are additive observers.
+      const quizCloseBtn = doc.getElementById("quizClose");
+      quizCloseBtn?.addEventListener("click", onQuizCloseSignal);
+      quizOverlayEl?.addEventListener("mousedown", (event: Event) => {
+        if (event.target === quizOverlayEl) onQuizCloseSignal();
+      });
       // Burn-CD popup: capture phase so our provider-aware submit runs
       // before home.html's legacy dev-string handler.
       urlInputEl?.addEventListener("keydown", onUrlInputKeydown, true);
@@ -1668,6 +1749,11 @@ export function LegacyDesignFrame() {
         lyricOverlay?.removeEventListener("mousedown", onLyricOverlayMousedown);
         searchClose?.removeEventListener("click", onSearchCloseClick);
         searchOverlay?.removeEventListener("mousedown", onSearchOverlayMousedown);
+        quizIcon?.removeEventListener("click", onQuizOpen);
+        // NB: the scrim-mousedown handler was registered as an inline
+        // arrow — the iframe document is torn down on navigation so no
+        // explicit removeEventListener is needed there. The close-btn
+        // handler is also attached to the iframe's DOM, same lifecycle.
         urlInputEl?.removeEventListener("keydown", onUrlInputKeydown, true);
         urlInputEl?.removeEventListener("input", onUrlInputInput);
         manualLyricsLink?.removeEventListener("click", onManualLyricsClick);

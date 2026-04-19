@@ -826,6 +826,59 @@
             transform: scale(1.08);
         }
 
+        /* Quiz overlay — identical chrome to the settings overlay so the
+           new popup feels native (same scrim fade, same ivory card, same
+           close button). The only variation is window height, tuned to
+           fit the quiz content without scrolling most of the time. */
+        .quiz-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+        .quiz-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .quiz-window {
+            position: relative;
+            width: 700px;
+            height: 540px;
+            background: #fdf8ec;
+            border-radius: 14px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+            overflow: hidden;
+        }
+        .quiz-overlay iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: transparent;
+            display: block;
+        }
+        .quiz-close {
+            position: absolute;
+            top: 14px;
+            right: 16px;
+            width: 36px;
+            height: 35px;
+            background: url("assets/home/gacha/exit%20button.png") no-repeat center/contain;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            z-index: 5;
+            transition: transform 0.15s ease;
+        }
+        .quiz-close:hover {
+            transform: scale(1.08);
+        }
+
         .notes-overlay {
             position: fixed;
             inset: 0;
@@ -1438,6 +1491,16 @@
         </div>
     </div>
 
+    <!-- Quiz overlay — lazy-loaded nested iframe (mirrors the settings /
+         dictionary / lyric overlay pattern). Bridge wiring in the React
+         shell sets `window.__kotobaQuiz`'s api on first open. -->
+    <div class="quiz-overlay" id="quizOverlay">
+        <div class="quiz-window">
+            <button class="quiz-close" id="quizClose" aria-label="Close quiz"></button>
+            <iframe id="quizFrame" title="Study quiz"></iframe>
+        </div>
+    </div>
+
     <div class="notes-overlay" id="notesOverlay">
         <div class="notes-window">
             <button class="notes-close" id="notesClose" aria-label="Close notes"></button>
@@ -1751,6 +1814,38 @@
         });
         document.getElementById('settingsClose').addEventListener('click', () => {
             settingsOverlay.classList.remove('open');
+        });
+
+        // Quiz icon — inert before this feature; now opens the study
+        // quiz popup (quiz.html) in the same iframe-overlay pattern as
+        // settings/notes/dictionary/lyric. The React bridge
+        // (src/frontend/LegacyDesignFrame.tsx) listens for the overlay
+        // opening and installs the popupQuiz facade on the iframe.
+        const quizOverlay = document.getElementById('quizOverlay');
+        const quizFrame = document.getElementById('quizFrame');
+        document.querySelector('.quiz').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!quizFrame.getAttribute('src')) {
+                quizFrame.setAttribute('src', 'quiz.html');
+            }
+            quizOverlay.classList.add('open');
+        });
+        document.getElementById('quizClose').addEventListener('click', () => {
+            quizOverlay.classList.remove('open');
+        });
+        // Close on scrim click (mirrors the lyric/dictionary overlays).
+        quizOverlay.addEventListener('mousedown', (e) => {
+            if (e.target === quizOverlay) quizOverlay.classList.remove('open');
+        });
+        // Close when the embedded quiz page postMessages its close
+        // button — keeps the close control inside the iframe without
+        // reaching across the iframe boundary imperatively.
+        window.addEventListener('message', (event) => {
+            if (event.origin !== window.location.origin) return;
+            const data = event.data;
+            if (data && data.__kotobaQuiz === 'close') {
+                quizOverlay.classList.remove('open');
+            }
         });
 
         function ejectDisk() {

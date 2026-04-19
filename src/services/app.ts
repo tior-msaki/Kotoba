@@ -248,6 +248,86 @@ import {
   getRewardsSummary,
 } from "../domains/rewards/service";
 
+import {
+  buildStudyContext,
+  requestNextPopupQuestion,
+  submitPopupQuizAnswer,
+  getPopupQuizHistory,
+  getPopupQuizStreak,
+  getPopupQuizRecentRewards,
+  registerPopupQuizGenerator,
+  getRegisteredPopupQuizGenerator,
+  finalizePopupQuestion,
+  POPUP_QUIZ_LEDGER_REASON,
+} from "../domains/rewards/quiz/popupService";
+import {
+  getPopupQuizState,
+  getNextPopupQuestion,
+  submitPopupAnswerForFrontend,
+  prefetchNextPopupQuestion,
+  getPopupQuizRecentHistory,
+} from "../domains/rewards/quiz/popupContract";
+import { popupQuizNvidiaGenerator } from "../domains/rewards/quiz/popupGenerator";
+
+// Wire the NVIDIA-backed generator once at facade load. The generator
+// itself has no import-time side effects; registration lives here so
+// the popup quiz module stays testable in isolation (tests can import
+// the service without auto-registering the network-bound generator).
+// The registry is idempotent — later calls overwrite cleanly.
+registerPopupQuizGenerator(popupQuizNvidiaGenerator);
+
+/**
+ * Popup quiz — perpetual study popup. Backend-only in this build; the
+ * frontend popup/button is a separate workstream. Surface is
+ * intentionally small: the UI will only need study context, next
+ * question, answer submit, and history. The NVIDIA generator registers
+ * itself into this namespace in a later build step.
+ */
+/**
+ * Frontend integration contract — the stable surface popup/button UI
+ * teams hook into. See `src/domains/rewards/quiz/popupContract.ts` for
+ * the integration note with request/response shapes.
+ *
+ * The five methods below (`getState`, `getNext`, `submit`, `prefetchNext`,
+ * `recentHistory`) are the recommended integration points. Everything
+ * else on this namespace (including the lower-level `requestNextQuestion`,
+ * `submitAnswer`, `registerGenerator`, `buildStudyContext`, etc.) is
+ * internal wiring kept here for testability.
+ *
+ * Correct-answer material is NEVER included in `getNext`'s return
+ * payload. It is only revealed in `submit`'s response, after the
+ * caller has committed to an answer index.
+ */
+export const popupQuiz = {
+  // ── Frontend integration surface (stable) ─────────────────────────
+  /** Lightweight composite state — balance, streak, outstanding flag.
+   *  Never triggers LLM calls. */
+  getState: getPopupQuizState,
+  /** Sanitised question view — no correct-answer signal in the payload. */
+  getNext: getNextPopupQuestion,
+  /** Evaluate an answer by question id. Server-verified, idempotent,
+   *  returns the revealed correct option + explanation + new state. */
+  submit: submitPopupAnswerForFrontend,
+  /** Fire-and-forget warm-up; safe to call on popup mount. */
+  prefetchNext: prefetchNextPopupQuestion,
+  /** Recent answered questions, newest-first. No secrets. */
+  recentHistory: getPopupQuizRecentHistory,
+
+  // ── Internal wiring (kept for testability and the NVIDIA generator
+  //    auto-registration below — frontend teammates should not use
+  //    these directly). ───────────────────────────────────────────────
+  buildStudyContext,
+  requestNextQuestion: requestNextPopupQuestion,
+  submitAnswer: submitPopupQuizAnswer,
+  getHistory: getPopupQuizHistory,
+  getStreak: getPopupQuizStreak,
+  getRecentRewards: getPopupQuizRecentRewards,
+  LEDGER_REASON: POPUP_QUIZ_LEDGER_REASON,
+  registerGenerator: registerPopupQuizGenerator,
+  getRegisteredGenerator: getRegisteredPopupQuizGenerator,
+  finalizeQuestion: finalizePopupQuestion,
+} as const;
+
 export const rewards = {
   // Quiz
   startQuiz,
@@ -360,3 +440,30 @@ export type {
   Photocard,
   PhotocardInventoryItem,
 } from "../domains/rewards/types";
+
+export type {
+  PopupQuizQuestion,
+  PopupQuizOption,
+  PopupQuizAnswerResult,
+  PopupQuizHistoryEntry,
+  PopupQuizGenerator,
+  PopupQuizGeneratorOptions,
+  PopupQuizSourceRef,
+  PopupQuestionKind,
+  StudyContext,
+  StudyDictionaryPick,
+  StudyLinePick,
+  StudySongPick,
+} from "../domains/rewards/quiz/popupTypes";
+
+// Frontend-integration contract shapes. The view type omits correct-
+// answer fields; the submit response carries them only after the user
+// commits to an option.
+export type {
+  PopupQuizQuestionView,
+  PopupQuizState,
+  PopupQuizSubmitResponse,
+} from "../domains/rewards/quiz/popupContract";
+
+// Streak is derived (not persisted) so its shape lives in popupService.
+export type { PopupQuizStreak } from "../domains/rewards/quiz/popupService";
