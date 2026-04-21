@@ -873,6 +873,7 @@ body.page-ready { opacity: 1; }
   var state = {
     context: null,         // { songTitle, artistName, sourceTrackId, direction }
     lyrics: null,          // { stanzas: [[line, line], [line]] }
+    lyricsText: null,      // raw text passed to loadLyrics — persisted by the slot-memory autosave so we can rehydrate verbatim
     direction: 'ja-en',
     view: 'all',           // 'all' | 'stanza' | 'line' | 'word'
     activeStanzaIndex: 0,
@@ -890,7 +891,13 @@ body.page-ready { opacity: 1; }
     wordDetailMap: new Map(),
     busy: false,
     lastError: null,
-    isDemo: false
+    isDemo: false,
+    // True while the bridge is rehydrating a saved slot via open(); the
+    // internal emitSessionChange calls triggered by loadLyrics / setView
+    // / onDirectionChange during that window would otherwise re-save
+    // the state we just loaded. The bridge relies on this guard to keep
+    // restore idempotent.
+    suppressEmit: false
   };
 
   // ─── Callbacks supplied by the React bridge ────────────────────────
@@ -900,8 +907,40 @@ body.page-ready { opacity: 1; }
     saveWord: null,
     askQuestion: null,
     analyzeWordDetail: null,
-    close: null
+    close: null,
+    // Fired when any persistence-worthy state changes. The React bridge
+    // uses this to autosave the current playlist/CD slot. Payload is a
+    // snapshot — the bridge decides slot identity and shape.
+    onSessionChange: null
   };
+
+  // Emit a session-change snapshot. Safe to call at any time; the bridge
+  // applies its own empty-state guards before writing. Silently swallows
+  // handler errors so a buggy autosave can never break the lyric UI.
+  function emitSessionChange(reason) {
+    if (state.suppressEmit) return;
+    if (typeof callbacks.onSessionChange !== 'function') return;
+    if (!state.context) return;
+    var payload = {
+      reason: reason || 'change',
+      songTitle: state.context.songTitle,
+      artistName: state.context.artistName,
+      sourceTrackId: state.context.sourceTrackId,
+      direction: state.direction,
+      lyricsText: (typeof state.lyricsText === 'string' && state.lyricsText.length > 0)
+        ? state.lyricsText
+        : null,
+      hasLyrics: !!(state.lyrics && state.lyrics.stanzas && state.lyrics.stanzas.length > 0),
+      view: state.view,
+      activeLineRef: state.activeLineRef
+        ? { stanzaIndex: state.activeLineRef.stanzaIndex, lineIndex: state.activeLineRef.lineIndex }
+        : null,
+      activeStanzaIndex: (typeof state.activeStanzaIndex === 'number') ? state.activeStanzaIndex : null,
+      isDemo: !!state.isDemo,
+      analysisCount: state.analysisMap ? state.analysisMap.size : 0
+    };
+    try { callbacks.onSessionChange(payload); } catch (e) { /* ignore */ }
+  }
 
   // ─── Demo lyrics (explicit fallback — only loaded when the user
   //     clicks "use demo" or the overlay is opened in hash-demo mode) ──
@@ -996,6 +1035,7 @@ body.page-ready { opacity: 1; }
 
   function setView(v) {
     if (v !== 'all' && v !== 'stanza' && v !== 'line' && v !== 'word') v = 'all';
+    var changed = state.view !== v;
     state.view = v;
     var tabs = viewTabsEl.querySelectorAll('.view-tab');
     for (var i = 0; i < tabs.length; i++) {
@@ -1003,6 +1043,7 @@ body.page-ready { opacity: 1; }
     }
     renderLyrics();
     renderAnalysis();
+    if (changed) emitSessionChange('view');
   }
 
   /**
@@ -1045,10 +1086,125 @@ body.page-ready { opacity: 1; }
     translateAllBtn.hidden = !hasLyrics;
   }
 
+  // ─── Unified line-analysis chokepoint ───────────────────────────────
+  // Any caller that wants the analysis for a (si, li) goes through
+  // requestAnalyzeLine. It:
+  //   - returns instantly from state.analysisMap when present,
+  //   - joins an in-flight request (shared by select-line + prefetch +
+  //     translate-all) so the same line is never fetched twice, and
+  //   - guards against stale direction / stale-lyrics writes.
+  // Pure plumbing — the backend call, its shape, and caching below it
+  // are entirely unchanged.
+  var inFlightByKey = Object.create(null);
+  function requestAnalyzeLine(si, li) {
+    if (!state.lyrics || !state.lyrics.stanzas[si] ||
+        typeof state.lyrics.stanzas[si][li] !== 'string') {
+      return Promise.reject(new Error('line out of range'));
+    }
+    var key = lineKey(si, li);
+    if (state.analysisMap.has(key)) {
+      return Promise.resolve(state.analysisMap.get(key));
+    }
+    if (inFlightByKey[key]) {
+      return inFlightByKey[key];
+    }
+    if (typeof callbacks.analyzeLine !== 'function') {
+      return Promise.reject(new Error('Analysis backend not connected in this context.'));
+    }
+    var lineText = state.lyrics.stanzas[si][li];
+    var requestDirection = state.direction;
+    var requestLyrics = state.lyrics;
+    var promise;
+    try {
+      promise = Promise.resolve(
+        callbacks.analyzeLine(lineText, li + 1, si + 1, requestDirection)
+      );
+    } catch (err) {
+      return Promise.reject(err);
+    }
+    var wrapped = promise.then(function (result) {
+      delete inFlightByKey[key];
+      // Direction / lyrics changed while the request was in flight —
+      // drop stale result so the freshly-reset analysisMap stays clean.
+      if (state.direction !== requestDirection) return null;
+      if (state.lyrics !== requestLyrics) return null;
+      if (result && typeof result === 'object') {
+        state.analysisMap.set(key, result);
+        emitSessionChange('line-analyzed');
+      }
+      return result;
+    }, function (err) {
+      delete inFlightByKey[key];
+      throw err;
+    });
+    inFlightByKey[key] = wrapped;
+    return wrapped;
+  }
+
+  // DOM-surgical progress indicator — adds the .analyzed class to the
+  // specific line element without calling renderLyrics(). Avoids the
+  // scroll-reset / flicker that full re-renders would cause while the
+  // background prefetch is landing results.
+  function markLineAnalyzedInDom(si, li) {
+    if (!lyricsPane) return;
+    var sel = '.line[data-si="' + si + '"][data-li="' + li + '"]';
+    var nodes = lyricsPane.querySelectorAll(sel);
+    for (var i = 0; i < nodes.length; i++) nodes[i].classList.add('analyzed');
+  }
+
+  // Bumped on loadLyrics / open / direction-change to cancel any
+  // in-progress prefetch walk for the previous state.
+  var prefetchToken = 0;
+
+  /**
+   * Start background line-analysis preparation for the currently-loaded
+   * lyrics. Concurrency-bounded (2) so we don't flood the LLM proxy.
+   * Silent — no button change, no view jump, no loading state.
+   * Re-uses requestAnalyzeLine, so a user click mid-prefetch joins the
+   * same in-flight promise instead of firing a duplicate.
+   */
+  function prefetchLinesInBackground() {
+    if (!state.lyrics || !callbacks.analyzeLine) return;
+    if (state.isDemo) return; // demo lyrics are a local fallback, don't spend tokens on them
+    var myToken = ++prefetchToken;
+    var pending = [];
+    for (var si = 0; si < state.lyrics.stanzas.length; si++) {
+      for (var li = 0; li < state.lyrics.stanzas[si].length; li++) {
+        if (!state.analysisMap.has(lineKey(si, li))) {
+          pending.push({ si: si, li: li });
+        }
+      }
+    }
+    if (pending.length === 0) return;
+    var cursor = 0;
+    var CONCURRENCY = 2;
+    function worker() {
+      if (myToken !== prefetchToken) return;
+      if (cursor >= pending.length) return;
+      var item = pending[cursor++];
+      // A click (or translate-all) may have fulfilled or started this
+      // line since we queued it — requestAnalyzeLine handles both cases
+      // by returning the cache hit / joining the in-flight promise.
+      requestAnalyzeLine(item.si, item.li).then(function () {
+        if (myToken !== prefetchToken) return;
+        markLineAnalyzedInDom(item.si, item.li);
+        refreshSongStatus();
+        worker();
+      }, function () {
+        // Failures are isolated per line — a single bad line must not
+        // break the session. The line stays clickable and the user's
+        // real click will retry it.
+        if (myToken !== prefetchToken) return;
+        worker();
+      });
+    }
+    for (var n = 0; n < CONCURRENCY; n++) worker();
+  }
+
   /**
    * "Translate all" — iterates every line through the existing
-   * callbacks.analyzeLine pipeline in sequence (bounded to 1 at a time
-   * client-side so we don't fan out N simultaneous LLM calls).
+   * callbacks.analyzeLine pipeline (now via requestAnalyzeLine for
+   * dedup with the background prefetch / click paths).
    * Skips lines that are already analyzed. Progress is surfaced via
    * songStatusEl; the concatenated output shows up in the "all" view's
    * analysis pane (renderSongOverview already joins culturalTranslations).
@@ -1072,15 +1228,7 @@ body.page-ready { opacity: 1; }
         var key = lineKey(si, li);
         if (state.analysisMap.has(key)) { done++; continue; }
         try {
-          var result = await callbacks.analyzeLine(
-            stanzas[si][li],
-            li + 1,
-            si + 1,
-            state.direction
-          );
-          if (result && typeof result === 'object') {
-            state.analysisMap.set(key, result);
-          }
+          await requestAnalyzeLine(si, li);
         } catch (err) {
           failed++;
         }
@@ -1145,9 +1293,15 @@ body.page-ready { opacity: 1; }
   }
 
   function loadLyrics(text, isDemo) {
+    state.lyricsText = (typeof text === 'string') ? text : null;
     state.lyrics = splitLyrics(text);
     state.isDemo = !!isDemo;
     state.analysisMap = new Map();
+    // New lyrics → invalidate any in-flight requests from the previous
+    // lyrics set and cancel any prefetch walk. requestAnalyzeLine's
+    // stale-state guards handle late writes defensively too.
+    inFlightByKey = Object.create(null);
+    prefetchToken++;
     state.activeLineRef = null;
     state.activeStanzaIndex = 0;
     state.selectionAnalysis = null;
@@ -1156,6 +1310,11 @@ body.page-ready { opacity: 1; }
     }
     renderLyrics();
     renderAnalysis();
+    emitSessionChange('lyrics-loaded');
+    // Kick off background line-analysis prep — the user can keep
+    // clicking lines normally; prefetched hits just make those clicks
+    // faster. Runs on a microtask so this function returns promptly.
+    Promise.resolve().then(prefetchLinesInBackground);
   }
 
   function lineHtml(si, li, text, opts) {
@@ -1477,6 +1636,7 @@ body.page-ready { opacity: 1; }
     state.selectionAnalysis = null;
     state.selectionAnswer = null;
     renderLyrics();
+    emitSessionChange('active-line');
 
     var key = lineKey(si, li);
     if (state.analysisMap.has(key)) {
@@ -1493,11 +1653,12 @@ body.page-ready { opacity: 1; }
     state.busy = true;
     renderAnalysisLoading('analyzing this line…');
     try {
-      var lineText = state.lyrics.stanzas[si][li];
-      var result = await callbacks.analyzeLine(lineText, li + 1, si + 1, state.direction);
-      if (result && typeof result === 'object') {
-        state.analysisMap.set(key, result);
-      }
+      // Route through the unified chokepoint. If the background prefetch
+      // (or a prior manual translate-all) is already working on this
+      // line, requestAnalyzeLine returns that in-flight promise and we
+      // never fire a duplicate LLM call. analysisMap is written inside
+      // requestAnalyzeLine on success — no double-write here.
+      await requestAnalyzeLine(si, li);
     } catch (err) {
       state.lastError = (err && err.message) ? err.message : String(err);
       state.busy = false;
@@ -2251,6 +2412,12 @@ body.page-ready { opacity: 1; }
   function onDirectionChange(newDir) {
     if (state.direction === newDir) return;
     state.analysisMap = new Map();
+    // Direction affects the model's output language, so any in-flight
+    // request queued under the old direction is now stale — cancel the
+    // prefetch walk and drop the dedup map. requestAnalyzeLine's
+    // direction-guard also discards in-flight writes after this.
+    inFlightByKey = Object.create(null);
+    prefetchToken++;
     state.selectionAnalysis = null;
     state.selectionAnswer = null;
     state.pendingQuestionText = null;
@@ -2260,6 +2427,10 @@ body.page-ready { opacity: 1; }
     setDirection(newDir, true);
     renderLyrics();
     renderAnalysis();
+    emitSessionChange('direction');
+    // Re-prime the cache for the new direction so the user's next line
+    // click is fast again.
+    Promise.resolve().then(prefetchLinesInBackground);
   }
   dirJaEnBtn.addEventListener('click', function () { onDirectionChange('ja-en'); });
   dirEnJaBtn.addEventListener('click', function () { onDirectionChange('en-ja'); });
@@ -2281,33 +2452,100 @@ body.page-ready { opacity: 1; }
   window.__kotobaLyric = {
     open: function (ctx) {
       ctx = ctx || {};
-      state.context = {
-        songTitle: ctx.songTitle || 'Unknown Song',
-        artistName: ctx.artistName || 'Unknown Artist',
-        sourceTrackId: ctx.sourceTrackId,
-        direction: ctx.direction
-      };
-      setTitle(state.context.songTitle, state.context.artistName);
-      setDirection(ctx.direction || 'ja-en');
-      state.analysisMap = new Map();
-      state.activeLineRef = null;
-      state.activeStanzaIndex = 0;
-      state.selectionAnalysis = null;
-      state.selectionAnswer = null;
-      state.pendingQuestionText = null;
-      state.lastAttemptedAsk = null;
-      state.lastAttemptedSelection = null;
-      state.wordDetailMap = new Map();
-      state.isDemo = false;
-      state.view = 'all';
-      setView('all');
-
-      if (ctx.lyrics && typeof ctx.lyrics === 'string' && ctx.lyrics.trim().length > 0) {
-        loadLyrics(ctx.lyrics, !!ctx.isDemo);
-      } else {
+      // Hydration happens inside open() so the UI paints once with the
+      // restored state — no blank-then-populate flicker. Emits are
+      // suppressed for the whole open() body to keep restore idempotent;
+      // any subsequent user action fires emits normally.
+      state.suppressEmit = true;
+      try {
+        state.context = {
+          songTitle: ctx.songTitle || 'Unknown Song',
+          artistName: ctx.artistName || 'Unknown Artist',
+          sourceTrackId: ctx.sourceTrackId,
+          direction: ctx.direction
+        };
+        setTitle(state.context.songTitle, state.context.artistName);
+        setDirection(ctx.direction || 'ja-en');
+        state.analysisMap = new Map();
+        // Opening a new track: cancel any outstanding prefetch/dedup
+        // state from the previous track so late responses can't land
+        // on the new one. loadLyrics will bump these again if it runs.
+        inFlightByKey = Object.create(null);
+        prefetchToken++;
+        state.activeLineRef = null;
+        state.activeStanzaIndex = 0;
+        state.selectionAnalysis = null;
+        state.selectionAnswer = null;
+        state.pendingQuestionText = null;
+        state.lastAttemptedAsk = null;
+        state.lastAttemptedSelection = null;
+        state.wordDetailMap = new Map();
+        state.isDemo = false;
+        state.view = 'all';
+        state.lyricsText = null;
+        // These three weren't reset, so a prior session's "analyze
+        // failed" banner / spinner-busy flag / stale stanza data could
+        // bleed into the freshly-opened (possibly different-slot)
+        // session before the user interacts. Part of strict slot
+        // isolation at the iframe layer.
         state.lyrics = null;
-        renderEmptyLyrics();
-        renderEmptyAnalysis();
+        state.lastError = null;
+        state.busy = false;
+        setView('all');
+
+        if (ctx.lyrics && typeof ctx.lyrics === 'string' && ctx.lyrics.trim().length > 0) {
+          loadLyrics(ctx.lyrics, !!ctx.isDemo);
+        } else {
+          state.lyrics = null;
+          renderEmptyLyrics();
+          renderEmptyAnalysis();
+        }
+
+        // Hydration from a saved slot (when supplied by the React bridge).
+        // Applied after lyrics are loaded so stanza/line indices line up.
+        var hydrate = ctx.hydrate;
+        if (hydrate && typeof hydrate === 'object' && state.lyrics && state.lyrics.stanzas.length > 0) {
+          if (Array.isArray(hydrate.analyses)) {
+            for (var h = 0; h < hydrate.analyses.length; h++) {
+              var a = hydrate.analyses[h];
+              if (!a || typeof a !== 'object') continue;
+              if (typeof a.stanzaNumber !== 'number' || typeof a.lineNumber !== 'number') continue;
+              var si = a.stanzaNumber - 1;
+              var li = a.lineNumber - 1;
+              // Drop entries whose indices fall outside the current lyric
+              // shape — happens if the saved lyrics diverged from what's
+              // now loaded. Prevents a stray analysis card rendering
+              // against the wrong line.
+              if (si < 0 || si >= state.lyrics.stanzas.length) continue;
+              if (li < 0 || li >= state.lyrics.stanzas[si].length) continue;
+              state.analysisMap.set(lineKey(si, li), a);
+            }
+          }
+          if (hydrate.activeLineRef && typeof hydrate.activeLineRef === 'object') {
+            var rsi = hydrate.activeLineRef.stanzaIndex;
+            var rli = hydrate.activeLineRef.lineIndex;
+            if (typeof rsi === 'number' && typeof rli === 'number' &&
+                rsi >= 0 && rsi < state.lyrics.stanzas.length &&
+                rli >= 0 && rli < state.lyrics.stanzas[rsi].length) {
+              state.activeLineRef = { stanzaIndex: rsi, lineIndex: rli };
+              state.activeStanzaIndex = rsi;
+            }
+          }
+          if (typeof hydrate.activeStanzaIndex === 'number' &&
+              hydrate.activeStanzaIndex >= 0 &&
+              hydrate.activeStanzaIndex < state.lyrics.stanzas.length) {
+            state.activeStanzaIndex = hydrate.activeStanzaIndex;
+          }
+          if (hydrate.view === 'all' || hydrate.view === 'stanza' ||
+              hydrate.view === 'line' || hydrate.view === 'word') {
+            setView(hydrate.view);
+          } else {
+            renderLyrics();
+            renderAnalysis();
+          }
+        }
+      } finally {
+        state.suppressEmit = false;
       }
     },
     setAnalyzeLine: function (fn) { callbacks.analyzeLine = fn; },
@@ -2316,6 +2554,7 @@ body.page-ready { opacity: 1; }
     setAskQuestion: function (fn) { callbacks.askQuestion = fn; },
     setAnalyzeWordDetail: function (fn) { callbacks.analyzeWordDetail = fn; },
     setClose: function (fn) { callbacks.close = fn; },
+    setOnSessionChange: function (fn) { callbacks.onSessionChange = fn; },
     // for tests / debug
     _getState: function () { return state; },
     _loadLyrics: loadLyrics,

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kotoba — Study Quiz</title>
+<link href="https://fonts.googleapis.com/css2?family=Forum&family=Gamja+Flower&family=Noto+Serif+JP:wght@400;700&family=Linux+Libertine:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   Visual language: mirrors settings.html's hierarchy (big Gamja
+   Flower title, Forum ghost buttons, centered column) and picks
+   up `.notes-new-btn`'s warm-ivory card grammar so the answer
+   options blend into the parent's #fdf8ec card instead of
+   clashing as stark white rectangles. No new palette introduced.
+   ─────────────────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100vh;
+  background: transparent;
+  color: #000;
+  font-family: 'Linux Libertine', 'Times New Roman', serif;
+  overflow: hidden;
+}
+body {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+body.page-ready { opacity: 1; }
+
+/* ── Stage — fills the parent's .quiz-window card ── */
+.quiz-stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 44px 22px;
+  text-align: center;
+}
+
+/* ── Title — Gamja Flower, matching settings.html's "settings" title ── */
+.q-title {
+  font-family: 'Gamja Flower', cursive;
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 1;
+  color: #000;
+  margin-bottom: 6px;
+}
+
+/* ── Meta strip (coins · streak). Gamja Flower, centered below title,
+      same hand-drawn idiom as .erase-prompt / .url-input placeholders. ── */
+.q-meta {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  font-family: 'Gamja Flower', cursive;
+  font-size: 18px;
+  color: #000;
+  opacity: 0.85;
+  margin-bottom: 10px;
+}
+.q-meta-sep {
+  opacity: 0.4;
+}
+.q-meta-num {
+  font-family: 'Forum', serif;
+  font-size: 20px;
+}
+
+/* ── Divider rule — matches the border under settings title area and
+      notes-sidebar-header's thin divider. ── */
+.q-rule {
+  width: 100%;
+  border: none;
+  border-top: 1px solid #000;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+
+/* ── Body (scrollable when long) ── */
+.q-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+/* Small cursive status / loading / empty line — same language as
+   .erase-prompt in settings.html and the "first-visit" hint. */
+.q-status {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 20px;
+  line-height: 1.35;
+  color: #000;
+  opacity: 0.8;
+  padding: 22px 10px;
+  text-align: center;
+}
+
+/* Kind label — small uppercase Forum caption, matches the .theme-label
+   / .erase-status hierarchy settings uses for "what this section is". */
+.q-kind-label {
+  font-family: 'Forum', serif;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #000;
+  opacity: 0.65;
+}
+
+/* Source line — Gamja Flower, muted, matches .manual-lyrics-link weight. */
+.q-source {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 16px;
+  color: #000;
+  opacity: 0.7;
+  letter-spacing: 0.02em;
+  margin-bottom: 4px;
+}
+
+/* Prompt — the question itself. Noto Serif JP for JP glyphs, same as
+   dictionary's .hw and lyric's .analysis-headline treatment. */
+.q-prompt {
+  font-family: 'Noto Serif JP', 'Forum', serif;
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1.3;
+  color: #000;
+  padding: 4px 0 10px;
+}
+
+/* ── Options list — stacked. Card grammar borrowed from .notes-new-btn
+      (warm ivory fill + soft border + 6px radius + same hover color)
+      but with black Forum text to stay in the site's pure b&w text
+      palette. Each card feels native to the #fdf8ec parent surface. ── */
+.q-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
+  width: 100%;
+}
+.q-option {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font: inherit;
+  font-family: 'Forum', serif;
+  font-size: 17px;
+  line-height: 1.35;
+  text-align: left;
+  color: #000;
+  background: #f1e9d6;
+  border: 1px solid #c8bfa8;
+  border-left: 3px solid #c8bfa8;
+  border-radius: 6px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.q-option:hover:not(:disabled) {
+  background: #e8e0d0;
+}
+.q-option:disabled { cursor: default; }
+.q-option-marker {
+  font-family: 'Forum', serif;
+  font-size: 15px;
+  opacity: 0.55;
+  flex-shrink: 0;
+  width: 18px;
+}
+.q-option-text { flex: 1; }
+
+/* Feedback accents — thin left-border only (no filled backgrounds), to
+   stay restrained. Wrong uses the same red as .notes-delete-btn. */
+.q-option.is-correct {
+  border-left-color: #000;
+  background: #f5eed3;
+}
+.q-option.is-wrong {
+  border-left-color: #a23030;
+  background: #f0e2d6;
+}
+.q-option.is-dim {
+  opacity: 0.5;
+}
+
+/* ── Feedback strip — prose between thin rules, not a card. Matches
+      the way .erase-prompt / .erase-status float below their trigger. ── */
+.q-feedback {
+  margin-top: 8px;
+  padding: 10px 4px 0;
+  border-top: 1px solid #000;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+.q-feedback-head {
+  font-family: 'Forum', serif;
+  font-size: 20px;
+  line-height: 1.2;
+  color: #000;
+}
+.q-feedback-head.is-wrong { color: #a23030; }
+.q-feedback-explain {
+  font-family: 'Linux Libertine', 'Times New Roman', serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #000;
+}
+.q-feedback-reward {
+  font-family: 'Gamja Flower', cursive;
+  font-size: 18px;
+  color: #000;
+  opacity: 0.85;
+}
+
+/* ── Footer — centered ghost-button row, matching .erase-prompt-choices
+      (flex center, gap 28px) and .erase-btn sizing. ── */
+.q-footer {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 28px;
+  padding-top: 14px;
+  flex-shrink: 0;
+  width: 100%;
+}
+.q-ghost-btn {
+  font-family: 'Forum', serif;
+  font-size: 26px;
+  line-height: 1;
+  text-decoration: underline;
+  color: #000;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.q-ghost-btn:hover { opacity: 0.7; }
+.q-ghost-btn:disabled { opacity: 0.4; cursor: default; text-decoration: none; }
+
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="quiz-stage">
+  <div class="q-title">study quiz</div>
+  <div class="q-meta">
+    <span>coins <span class="q-meta-num" id="qCoins">0</span></span>
+    <span class="q-meta-sep">·</span>
+    <span>streak <span class="q-meta-num" id="qStreak">0</span></span>
+  </div>
+  <hr class="q-rule" />
+
+  <div class="q-body">
+    <!-- Loading / empty / error line. -->
+    <div class="q-status" id="qStatus">preparing a question…</div>
+
+    <!-- Question block -->
+    <div id="qBlock" class="hidden">
+      <div class="q-kind-label" id="qKindLabel"></div>
+      <div class="q-source" id="qSource"></div>
+      <div class="q-prompt" id="qPrompt"></div>
+      <div class="q-options" id="qOptions"></div>
+    </div>
+
+    <!-- Post-submit feedback block -->
+    <div id="qFeedback" class="q-feedback hidden">
+      <div class="q-feedback-head" id="qFeedbackHead"></div>
+      <div class="q-feedback-explain" id="qFeedbackExplain"></div>
+      <div class="q-feedback-reward" id="qFeedbackReward"></div>
+    </div>
+  </div>
+
+  <div class="q-footer">
+    <button type="button" class="q-ghost-btn hidden" id="qNextBtn">next question →</button>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   STUDY QUIZ POPUP
+   ─────────────────────────────────────────────
+   All backend calls go through the React bridge via the `api` object the
+   parent installs on `window.__kotobaQuiz`. Mirrors the bridge pattern
+   used by dictionary.html / lyric.html / search.html. Answer-key material
+   never crosses this boundary — the bridge hands over a sanitised
+   PopupQuizQuestionView with no isCorrect / correctOptionIndex /
+   explanation until after submit.
+
+   Public API (consumed by src/frontend/LegacyDesignFrame.tsx):
+     window.__kotobaQuiz.setApi(api)  — api = { getState, getNext, submit, prefetchNext }
+     window.__kotobaQuiz.open()       — called on overlay open; refresh UI
+     window.__kotobaQuiz.close()      — called on overlay close; reset UI
+═══════════════════════════════════════════════ */
+(function () {
+  var api = null;
+
+  var statusEl    = document.getElementById('qStatus');
+  var blockEl     = document.getElementById('qBlock');
+  var kindEl      = document.getElementById('qKindLabel');
+  var sourceEl    = document.getElementById('qSource');
+  var promptEl    = document.getElementById('qPrompt');
+  var optionsEl   = document.getElementById('qOptions');
+  var feedbackEl  = document.getElementById('qFeedback');
+  var feedbackHead = document.getElementById('qFeedbackHead');
+  var feedbackExplain = document.getElementById('qFeedbackExplain');
+  var feedbackReward = document.getElementById('qFeedbackReward');
+  var nextBtn     = document.getElementById('qNextBtn');
+  var coinsEl     = document.getElementById('qCoins');
+  var streakEl    = document.getElementById('qStreak');
+
+  var currentQuestion = null; // PopupQuizQuestionView | null
+  var submitting = false;
+  var openToken = 0;           // race guard against late async resolves
+
+  var KIND_LABEL = {
+    'word-meaning':   'word · meaning',
+    'word-reading':   'word · reading',
+    'line-meaning':   'line · meaning',
+    'fill-blank':     'fill the blank',
+    'reverse-meaning':'meaning → word'
+  };
+
+  function showStatus(text) {
+    statusEl.textContent = text || '';
+    statusEl.classList.remove('hidden');
+    blockEl.classList.add('hidden');
+    feedbackEl.classList.add('hidden');
+    nextBtn.classList.add('hidden');
+  }
+
+  function hideStatus() {
+    statusEl.classList.add('hidden');
+  }
+
+  function renderMeta(state) {
+    if (!state) return;
+    if (state.balance) coinsEl.textContent = String(state.balance.total);
+    if (state.streak)  streakEl.textContent = String(state.streak.current);
+  }
+
+  function renderQuestion(q) {
+    currentQuestion = q;
+    feedbackEl.classList.add('hidden');
+    nextBtn.classList.add('hidden');
+    hideStatus();
+    blockEl.classList.remove('hidden');
+
+    kindEl.textContent = KIND_LABEL[q.kind] || q.kind;
+
+    var sourceBits = [];
+    if (q.source && q.source.songTitle) {
+      var artist = q.source.artistName ? ' — ' + q.source.artistName : '';
+      sourceBits.push('from “' + q.source.songTitle + '”' + artist);
+    } else if (q.source && q.source.surface) {
+      sourceBits.push('based on “' + q.source.surface + '”');
+    }
+    sourceEl.textContent = sourceBits.join(' · ');
+
+    promptEl.textContent = q.prompt;
+
+    optionsEl.innerHTML = '';
+    var letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+    (q.options || []).forEach(function (opt, i) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'q-option';
+      btn.setAttribute('data-index', String(i));
+
+      var marker = document.createElement('span');
+      marker.className = 'q-option-marker';
+      marker.textContent = (letters[i] || String(i + 1)) + '.';
+
+      var text = document.createElement('span');
+      text.className = 'q-option-text';
+      text.textContent = opt.text;
+
+      btn.appendChild(marker);
+      btn.appendChild(text);
+      btn.addEventListener('click', function () { void onSelectOption(i); });
+      optionsEl.appendChild(btn);
+    });
+  }
+
+  function renderError(message) {
+    showStatus(message || 'something went wrong. try again in a moment.');
+  }
+
+  function renderEmpty() {
+    showStatus('save a few words from a song to start your quiz. come back here once you have a few entries.');
+  }
+
+  async function refreshState() {
+    if (!api || typeof api.getState !== 'function') return;
+    try {
+      var state = await api.getState();
+      renderMeta(state);
+    } catch (err) {
+      // State is informational — don't tear the UI down if it fails.
+    }
+  }
+
+  async function loadNextQuestion() {
+    if (!api || typeof api.getNext !== 'function') {
+      showStatus('quiz backend not connected.');
+      return;
+    }
+    submitting = false;
+    showStatus('preparing a question…');
+    var myToken = ++openToken;
+    try {
+      var q = await api.getNext();
+      if (myToken !== openToken) return;   // a newer open superseded this
+      if (!q) {
+        renderEmpty();
+        return;
+      }
+      renderQuestion(q);
+    } catch (err) {
+      if (myToken !== openToken) return;
+      renderError((err && err.message) ? err.message : 'failed to load a question.');
+    }
+  }
+
+  async function onSelectOption(selectedIndex) {
+    if (submitting) return;
+    if (!currentQuestion) return;
+    if (!api || typeof api.submit !== 'function') {
+      renderError('quiz backend not connected.');
+      return;
+    }
+    submitting = true;
+
+    // Disable all options during submit so the user can't double-pick.
+    var btns = optionsEl.querySelectorAll('.q-option');
+    btns.forEach(function (b) { b.disabled = true; });
+
+    var questionId = currentQuestion.id;
+    var myToken = openToken;
+    try {
+      var result = await api.submit(questionId, selectedIndex);
+      if (myToken !== openToken) return;
+      paintFeedback(result, selectedIndex);
+      // Refresh balance / streak from the result itself (saves a round-trip).
+      renderMeta({ balance: result.balance, streak: result.streak });
+    } catch (err) {
+      if (myToken !== openToken) return;
+      // StorageError ("unknown or expired id") — recover by loading fresh.
+      submitting = false;
+      btns.forEach(function (b) { b.disabled = false; });
+      showStatus('that question expired. loading a new one…');
+      setTimeout(function () { void loadNextQuestion(); }, 400);
+    }
+  }
+
+  function paintFeedback(result, selectedIndex) {
+    // Mark the options — correct / wrong / dim — without rebuilding them.
+    var btns = optionsEl.querySelectorAll('.q-option');
+    btns.forEach(function (b, i) {
+      b.classList.remove('is-correct', 'is-wrong', 'is-dim');
+      if (i === result.correctOptionIndex) b.classList.add('is-correct');
+      else if (i === selectedIndex && !result.correct) b.classList.add('is-wrong');
+      else b.classList.add('is-dim');
+    });
+
+    feedbackEl.classList.remove('hidden');
+    feedbackHead.classList.remove('is-wrong');
+    if (result.correct) {
+      feedbackHead.textContent = 'correct';
+    } else {
+      feedbackHead.textContent = 'not quite';
+      feedbackHead.classList.add('is-wrong');
+    }
+    feedbackExplain.textContent = result.explanation || '';
+    feedbackReward.textContent = result.currencyAwarded > 0
+      ? '+ ' + result.currencyAwarded + ' coin' + (result.currencyAwarded === 1 ? '' : 's')
+      : '';
+    nextBtn.classList.remove('hidden');
+  }
+
+  // Public API exposed to the React bridge.
+  window.__kotobaQuiz = {
+    setApi: function (incoming) { api = incoming || null; },
+    open: function () {
+      void refreshState();
+      void loadNextQuestion();
+      if (api && typeof api.prefetchNext === 'function') {
+        try { api.prefetchNext(); } catch (e) { /* swallow */ }
+      }
+    },
+    close: function () {
+      // Reset UI to the pre-open state so a reopen starts clean.
+      openToken++;
+      currentQuestion = null;
+      submitting = false;
+      feedbackEl.classList.add('hidden');
+      nextBtn.classList.add('hidden');
+      blockEl.classList.add('hidden');
+      statusEl.classList.remove('hidden');
+      statusEl.textContent = '';
+    }
+  };
+
+  nextBtn.addEventListener('click', function () {
+    if (submitting) return;
+    void loadNextQuestion();
+  });
+
+  requestAnimationFrame(function () { document.body.classList.add('page-ready'); });
+})();
+</script>
+</body>
+</html>

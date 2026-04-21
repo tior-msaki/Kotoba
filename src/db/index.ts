@@ -16,6 +16,8 @@ import type {
   StoredQuizSession,
   StoredCurrencyTransaction,
   StoredPhotocardInventoryItem,
+  StoredPopupQuizHistory,
+  StoredPopupQuizIssued,
 } from "./schema";
 
 type KotobaDB = Dexie & {
@@ -29,6 +31,8 @@ type KotobaDB = Dexie & {
   quizSessions: EntityTable<StoredQuizSession, "id">;
   currencyLedger: EntityTable<StoredCurrencyTransaction, "id">;
   photocardInventory: EntityTable<StoredPhotocardInventoryItem, "id">;
+  popupQuizHistory: EntityTable<StoredPopupQuizHistory, "id">;
+  popupQuizIssued: EntityTable<StoredPopupQuizIssued, "id">;
 };
 
 const db = new Dexie("KotobaDB") as KotobaDB;
@@ -49,6 +53,18 @@ db.version(1).stores({
 // v2: direction-aware dedupe index + language filtering indexes
 db.version(2).stores({
   dictionaryEntries: "id, [surface+romaji+direction], firstLetter, type, direction, sourceLanguage, updatedAt",
+});
+
+// v3: popup-quiz history. Additive only — every existing table is left
+// alone so prior stored data is preserved across the version bump.
+db.version(3).stores({
+  popupQuizHistory: "id, sourceId, kind, answeredAt, correct",
+});
+
+// v4: popup-quiz issued (delivered-but-unanswered) questions. Enables
+// server-side answer verification + farming protection. Additive only.
+db.version(4).stores({
+  popupQuizIssued: "id, issuedAt",
 });
 
 export { db };

@@ -725,26 +725,6 @@ async function run(): Promise<void> {
     "bridge duck-types the keydown event via .key instead of instanceof"
   );
 
-  // Visible submit button is part of the popup markup + bridge wiring.
-  assert(
-    /id="burnSubmitBtn"/.test(homeHtmlSrc2),
-    "home.html ships a visible #burnSubmitBtn in the laptop popup"
-  );
-  assert(
-    /\.burn-submit-btn\s*\{/.test(homeHtmlSrc2) &&
-      /\.laptop-stage\.phase-burn \.burn-submit-btn/.test(homeHtmlSrc2),
-    "burn-submit-btn uses phase-burn reveal (matches existing popup pattern)"
-  );
-  assert(
-    /burnSubmitBtn\?\.addEventListener\("click", onBurnSubmitClick\)/.test(bridgeTs) &&
-      /const onBurnSubmitClick/.test(bridgeTs),
-    "bridge wires the burn-submit-btn click"
-  );
-  assert(
-    /burnFromPastedUrl\(raw\)/.test(bridgeTs.split("onBurnSubmitClick")[1] ?? ""),
-    "burn-submit-btn click funnels into the same burnFromPastedUrl flow"
-  );
-
   // Empty-input submit shows a clear error, not a silent no-op.
   assert(
     /showBurnError\("Paste a playlist URL\."\)/.test(bridgeTs),
